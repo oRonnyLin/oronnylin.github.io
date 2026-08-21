@@ -1,0 +1,65 @@
+/* ==========================================================================
+   custom.css — your overrides live here.
+
+   css/style.css is the template's stylesheet. Leave it alone; put every
+   tweak of your own in this file instead. It loads last, so anything here
+   wins over the template.
+
+   Quick knobs:
+   - Accent colour: search css/style.css for #f96d00 (the orange) and
+     override the specific rules you care about here.
+   - Section spacing, fonts, and colours: add rules below.
+   ========================================================================== */
+
+/* --- Contact section ------------------------------------------------------ */
+
+.contact-list {
+	list-style: none;
+	padding: 0;
+	margin: 0 0 30px 0;
+}
+
+.contact-list li {
+	position: relative;
+	padding: 0 0 0 34px;
+	margin-bottom: 14px;
+	line-height: 1.6;
+	word-break: break-word;
+}
+
+.contact-list li i {
+	position: absolute;
+	left: 0;
+	top: 4px;
+	font-size: 18px;
+	color: #f96d00;
+}
+
+.contact-list li a {
+	color: inherit;
+	border-bottom: 1px solid rgba(0, 0, 0, .15);
+}
+
+.contact-list li a:hover {
+	color: #f96d00;
+	border-bottom-color: #f96d00;
+}
+
+/* Keeps the photo half of the contact block from collapsing when the text
+   half is short. */
+#fh5co-consult .fh5co-video {
+	min-height: 520px;
+}
+
+/* --- Small quality-of-life fixes ------------------------------------------ */
+
+/* The hero profile photo can look squashed if your image isn't square. */
+.profile-thumb {
+	background-size: cover !important;
+	background-position: center center !important;
+}
+
+/* Project tiles: slightly stronger hover cue. */
+#fh5co-work .work:hover .desc {
+	opacity: 1;
+}
