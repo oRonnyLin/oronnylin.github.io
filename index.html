@@ -5,19 +5,19 @@
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 
-	<title>Ronny Lin &mdash; Software Engineer</title>
-	<meta name="description" content="Senior Software Engineer at Microsoft in Vancouver, working across PowerPoint Live, Teams, and Windows Photos. Front-end performance, real-time media, and developer tooling." />
+	<title>Ronny Lin &mdash; Full Stack Developer</title>
+	<meta name="description" content="Full stack developer in Vancouver, working across PowerPoint Live, Teams, and Windows Photos. Front-end performance, real-time media, and developer tooling." />
 	<meta name="keywords" content="Ronny Lin, software engineer, Vancouver, Microsoft, TypeScript, React, front-end performance, real-time media" />
 	<meta name="author" content="Ronny Lin" />
 
-	<meta property="og:title" content="Ronny Lin &mdash; Software Engineer"/>
-	<meta property="og:description" content="Senior Software Engineer at Microsoft in Vancouver. Front-end performance, real-time media, and developer tooling."/>
+	<meta property="og:title" content="Ronny Lin &mdash; Full Stack Developer"/>
+	<meta property="og:description" content="Full stack developer in Vancouver. Front-end performance, real-time media, and developer tooling."/>
 	<meta property="og:url" content="https://oronnylin.github.io/"/>
 	<meta property="og:site_name" content="Ronny Lin"/>
 	<meta property="og:type" content="website"/>
 	<meta name="twitter:card" content="summary" />
-	<meta name="twitter:title" content="Ronny Lin &mdash; Software Engineer" />
-	<meta name="twitter:description" content="Senior Software Engineer at Microsoft in Vancouver. Front-end performance, real-time media, and developer tooling." />
+	<meta name="twitter:title" content="Ronny Lin &mdash; Full Stack Developer" />
+	<meta name="twitter:description" content="Full stack developer in Vancouver. Front-end performance, real-time media, and developer tooling." />
 	<!-- og:image intentionally omitted until there is a real photo to point it at -->
 
 	<link href="https://fonts.googleapis.com/css?family=Space+Mono" rel="stylesheet">
@@ -53,11 +53,12 @@
 							<div class="profile-thumb" style="background: url(images/profile.jpg);"></div>
 							-->
 							<h1><span>Ronny Lin</span></h1>
-							<h3><span>Senior Software Engineer at Microsoft</span></h3>
+							<h3><span>Full Stack Developer</span></h3>
 							<div class="fh5co-social-wrap">
 								<ul class="fh5co-social-icons">
 									<li><a href="https://github.com/oRonnyLin" target="_blank" rel="noopener" title="GitHub"><i class="icon-github"></i></a></li>
 									<li><a href="https://www.linkedin.com/in/ronnylin" target="_blank" rel="noopener" title="LinkedIn"><i class="icon-linkedin2"></i></a></li>
+									<li><a href="https://www.instagram.com/oronnylin/" target="_blank" rel="noopener" title="Instagram"><i class="icon-instagram2"></i></a></li>
 								</ul>
 							</div>
 						</div>
@@ -87,12 +88,13 @@
 				</div>
 				<div class="col-md-8">
 					<h2>Hello There!</h2>
-					<p>I'm a senior software engineer at Microsoft in Vancouver, working across PowerPoint Live, Teams, and Windows Photos. Most of what I do sits where front-end performance meets real-time media &mdash; making large web apps load faster, stream more reliably, and fail more gracefully when the network doesn't cooperate.</p>
+					<p>I'm a full-stack developer at Microsoft in Vancouver, working across PowerPoint Live, Teams, and Windows Photos. Most of what I do sits where front-end performance meets real-time media &mdash; making large web apps load faster, stream more reliably, and fail more gracefully when the network doesn't cooperate.</p>
 					<p>I started out at AltumView building IoT and computer-vision systems, where I'm a named inventor on a patent for privacy-preserving fall detection. Since joining Microsoft in 2020 I've taken a hackathon prototype to 3.7&nbsp;million monthly active users, led a cross-org migration of PowerPoint Live's sync pipeline, and built a lot of the inner-loop tooling my team uses day to day. I'm currently working through Stanford's XCS221 on artificial intelligence.</p>
 					<div class="fh5co-social-wrap">
 						<ul class="fh5co-social-icons">
 							<li><a href="https://github.com/oRonnyLin" target="_blank" rel="noopener"><i class="icon-github"></i></a></li>
 							<li><a href="https://www.linkedin.com/in/ronnylin" target="_blank" rel="noopener"><i class="icon-linkedin2"></i></a></li>
+							<li><a href="https://www.instagram.com/oronnylin/" target="_blank" rel="noopener"><i class="icon-instagram2"></i></a></li>
 						</ul>
 					</div>
 				</div>
@@ -111,11 +113,20 @@
 				<div class="col-md-12 col-md-offset-0">
 					<ul class="timeline">
 
-						<li class="timeline-heading text-center animate-box">
-							<div><h3>Work Experience</h3></div>
+						<li class="animate-box timeline-unverted">
+							<div class="timeline-badge"><i class="icon-graduation-cap"></i></div>
+							<div class="timeline-panel">
+								<div class="timeline-heading">
+									<h3 class="timeline-title">XCS221: Artificial Intelligence</h3>
+									<span class="company">Stanford Online &middot; August 2026 &ndash; October 2026</span>
+								</div>
+								<div class="timeline-body">
+									<p>Stanford&rsquo;s graduate-level AI course. Nominated and sponsored by Microsoft. In progress.</p>
+								</div>
+							</div>
 						</li>
 
-						<li class="animate-box timeline-unverted">
+						<li class="timeline-inverted animate-box">
 							<div class="timeline-badge"><i class="icon-suitcase"></i></div>
 							<div class="timeline-panel">
 								<div class="timeline-heading">
@@ -123,18 +134,12 @@
 									<span class="company">Microsoft &mdash; PowerPoint Live / Teams / Windows Photos &middot; December 2023 &ndash; Present</span>
 								</div>
 								<div class="timeline-body">
-									<ul>
-										<li>Prototyped a modular rewrite of PowerPoint Live's bootstrapper, won funding for it, and led five engineers to productionize it &mdash; converting runtime script injection into a dynamic import the host prefetches while idle, improving perceived load time by 15%.</li>
-										<li>Led the cross-org migration of PowerPoint Live's sync pipeline onto Teams' real-time communication stack, with dual-channel fallback and client-side dedup for a zero-downtime rollout.</li>
-										<li>Drove session quality from 90% to a historical high of 94% via a secondary-CDN retry strategy recovering 57,000+ sessions monthly, plus a completed CDN service migration.</li>
-										<li>Built an HTTPS-intercepting telemetry viewer in Electron and TypeScript &mdash; Fiddler-like capture via mockttp, a real-time log and network timeline, and an MCP server for agent interactions.</li>
-										<li>Diagnosed Copilot latency with enterprise customers including EY, Deloitte, McKinsey, and UBS, root-causing it to repeated brand-asset fetches and LLM retries; the proposed caching and validation fixes were adopted.</li>
-									</ul>
+									<p>Working across PowerPoint Live, Teams, and Windows Photos &mdash; leading a modular rewrite of PowerPoint Live&rsquo;s bootstrapper, migrating its live sync pipeline onto Teams&rsquo; real-time stack, and building the telemetry and dev tooling the team runs on. Also shipped generative AI features in Windows Photos for the Copilot+PC launch.</p>
 								</div>
 							</div>
 						</li>
 
-						<li class="timeline-inverted animate-box">
+						<li class="animate-box timeline-unverted">
 							<div class="timeline-badge"><i class="icon-suitcase"></i></div>
 							<div class="timeline-panel">
 								<div class="timeline-heading">
@@ -142,16 +147,12 @@
 									<span class="company">Microsoft &mdash; Teams / Office 365 &middot; November 2020 &ndash; November 2023</span>
 								</div>
 								<div class="timeline-body">
-									<ul>
-										<li>Took Teams Video Clips in Channels from hackathon prototype to production for 3.7M monthly active users, re-architecting playback for 21% faster preview load, React render from 0.8s to 0.4s, and a 30% smaller bundle.</li>
-										<li>Implemented HLS media playback in Teams using React, and built plugin and integration APIs for Microsoft's internal media streaming platform, enabling reuse across Office 365 apps.</li>
-										<li>Won Microsoft's Global Hackathon and Executive Challenge for a video messaging project letting users speak in their own voice in the language they prefer.</li>
-									</ul>
+									<p>Took Teams Video Clips from hackathon prototype to production for 3.7M monthly active users, and built HLS playback and media platform APIs used across Office 365. Winner of Microsoft&rsquo;s Global Hackathon and Executive Challenge.</p>
 								</div>
 							</div>
 						</li>
 
-						<li class="animate-box timeline-unverted">
+						<li class="timeline-inverted animate-box">
 							<div class="timeline-badge"><i class="icon-suitcase"></i></div>
 							<div class="timeline-panel">
 								<div class="timeline-heading">
@@ -159,16 +160,12 @@
 									<span class="company">AltumView Systems Inc. &middot; January 2018 &ndash; December 2019</span>
 								</div>
 								<div class="timeline-body">
-									<ul>
-										<li>Built an IoT management platform using Node.js, React, Express, and MQTT to stream and control smart devices.</li>
-										<li>Built an automated image dataset pipeline (LAMP, Python, AWS) for machine-learning training.</li>
-										<li>Named inventor on <a href="https://patents.google.com/patent/US11179064B2/en" target="_blank" rel="noopener">US&nbsp;11,179,064</a> &mdash; Method and System for Privacy-Preserving Fall Detection.</li>
-									</ul>
+									<p>Built an IoT management platform (Node.js, React, MQTT) for smart camera devices and ML dataset pipelines on AWS. Named inventor on <a href="https://patents.google.com/patent/US11179064B2/en" target="_blank" rel="noopener">US&nbsp;11,179,064</a>, privacy-preserving fall detection.</p>
 								</div>
 							</div>
 						</li>
 
-						<li class="timeline-inverted animate-box">
+						<li class="animate-box timeline-unverted">
 							<div class="timeline-badge"><i class="icon-lab"></i></div>
 							<div class="timeline-panel">
 								<div class="timeline-heading">
@@ -176,29 +173,7 @@
 									<span class="company">Academia Sinica, National Academy of Taiwan &middot; July &ndash; September 2017</span>
 								</div>
 								<div class="timeline-body">
-									<ul>
-										<li>Air quality sensor data analysis, Taipei, Taiwan.</li>
-									</ul>
-								</div>
-							</div>
-						</li>
-
-						<br>
-						<li class="timeline-heading text-center animate-box">
-							<div><h3>Education</h3></div>
-						</li>
-
-						<li class="animate-box timeline-unverted">
-							<div class="timeline-badge"><i class="icon-graduation-cap"></i></div>
-							<div class="timeline-panel">
-								<div class="timeline-heading">
-									<h3 class="timeline-title">Stanford Online &mdash; XCS221: Artificial Intelligence</h3>
-									<span class="company">August 2026 &ndash; October 2026 &middot; Nominated, Microsoft-sponsored</span>
-								</div>
-								<div class="timeline-body">
-									<ul>
-										<li>Principles and techniques of artificial intelligence. Currently in progress.</li>
-									</ul>
+									<p>Air quality sensor data analysis. Taipei, Taiwan.</p>
 								</div>
 							</div>
 						</li>
@@ -211,9 +186,7 @@
 									<span class="company">University of British Columbia &middot; September 2013 &ndash; May 2017</span>
 								</div>
 								<div class="timeline-body">
-									<ul>
-										<li>Major in Computer Science.</li>
-									</ul>
+									<p>Major in Computer Science.</p>
 								</div>
 							</div>
 						</li>
@@ -429,6 +402,7 @@
 			<ul class="contact-list">
 				<li><i class="icon-linkedin2"></i><a href="https://www.linkedin.com/in/ronnylin" target="_blank" rel="noopener">linkedin.com/in/ronnylin</a></li>
 				<li><i class="icon-github"></i><a href="https://github.com/oRonnyLin" target="_blank" rel="noopener">github.com/oRonnyLin</a></li>
+				<li><i class="icon-instagram2"></i><a href="https://www.instagram.com/oronnylin/" target="_blank" rel="noopener">instagram.com/oronnylin</a></li>
 				<li><i class="icon-location2"></i><span>Vancouver, British Columbia</span></li>
 			</ul>
 			<p><a href="files/resume.pdf" target="_blank" rel="noopener" class="btn btn-primary">Download Resume</a></p>
