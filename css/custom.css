@@ -204,3 +204,79 @@ a.work--link:focus {
 #fh5co-work .fh5co-heading p {
 	color: #111;
 }
+
+/* --- "In progress" markers ------------------------------------------------
+   Two levels, one class, one colour.
+
+   .wip          a small-caps line under a section <h2>.
+   .wip.wip-tag  the same line as a chip on a single project tile.
+
+   Colour is #111 throughout -- as ink on the section line (18.88:1 on the
+   white sections, 8.31:1 on the #FF9000 ones) and as the chip's plate under
+   white text (18.88:1). It is the value already used for the #fh5co-work
+   subheading above, so the system introduces no new colour.
+
+   The class declares its own type rather than borrowing .fh5co-heading span,
+   so it renders identically in a heading, in a tile, and in the footer. The
+   second selector is (0,0,2,0), which beats .fh5co-heading span (0,0,1,1) --
+   no !important needed. Use a <span>: a <p> here would be captured by
+   #fh5co-work .fh5co-heading p (1,0,1,1) and silently lose its colour. */
+
+.wip,
+.fh5co-heading .wip {
+	display: block;
+	font-family: "Space Mono", Menlo, Consolas, monospace;
+	font-size: 12px;
+	line-height: 1.5;
+	letter-spacing: 2px;
+	text-transform: uppercase;
+	color: #111;
+	margin: -6px 0 16px;   /* pulls the line up under its own <h2> */
+}
+
+/* Item level. Lives inside .work but OUTSIDE .desc, so .work .desc{opacity:0}
+   (style.css:730) and .work:hover .desc{opacity:1} (style.css:770) never
+   reach it -- the chip is equally visible on a flat tile, on a screenshot
+   tile, on mobile, and to a keyboard user. Being a <span> inside the <a>,
+   clicks pass straight through to the link.
+
+   Copy budget: ~24 uppercase characters on one line at the tightest tile
+   width. Longer text wraps upward and doubles the chip's visual weight. */
+
+.wip.wip-tag {
+	position: absolute;
+	left: 12px;
+	bottom: 12px;
+	z-index: 2;
+	max-width: calc(100% - 24px);
+	margin: 0;
+	padding: 5px 9px;
+	font-size: 11px;
+	line-height: 1.45;
+	letter-spacing: 1px;
+	border-radius: 2px;
+	background: #111;
+	color: #fff;
+}
+
+/* --- Keyboard access for future screenshot tiles --------------------------
+   Separate from the markers; delete independently. Flat tiles already have
+   a focus treatment above. A screenshot tile (class="work" with a
+   background-image, no work--flat) hides its caption until hover and the
+   template kills focus outlines globally (style.css:57) -- without this a
+   keyboard user tabs through an invisible tile. */
+
+a.work:focus-visible {
+	outline: 2px solid #fff;
+	outline-offset: -4px;
+}
+
+a.work:focus-visible .desc {
+	opacity: 1;
+}
+
+a.work:focus-visible .desc h3,
+a.work:focus-visible .desc span {
+	-webkit-transform: translate3d(0, 0, 0);
+	transform: translate3d(0, 0, 0);
+}

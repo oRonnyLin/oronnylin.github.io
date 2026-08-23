@@ -50,3 +50,26 @@ numbers.
 
 `files/resume.pdf` is a copy of `Resume_Web_Public.pdf`. Re-copy it when the
 source changes — it does not update itself.
+
+## Marking something as still in progress
+
+Section still growing — one line under the heading:
+
+	<h2>Photography</h2>
+	<span class="wip">Still scanning &mdash; more going up</span>
+
+Must be a `<span>`, and must go after the `</h2>`. A `<p>` gets its colour
+overridden inside Selected Work.
+
+One project whose write-up isn't up yet — a chip on the tile, as the last
+child of `.work`, a sibling of `.desc` (never inside it):
+
+	<div class="work work--flat">
+		<div class="desc">...</div>
+		<span class="wip wip-tag">Write-up coming</span>
+	</div>
+
+Rules: say what's missing ("WRITE-UP COMING"), not "IN PROGRESS" — on a
+shipped project that reads as though the project is half-built. Under 24
+characters or it wraps. Never more than two tiles at once. Delete the line
+when the thing lands.
