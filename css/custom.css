@@ -63,3 +63,144 @@
 #fh5co-work .work:hover .desc {
 	opacity: 1;
 }
+
+/* --- Social icon rows -----------------------------------------------------
+   Replaces the template's <p><ul></ul></p>, which is invalid HTML — the
+   parser auto-closes the <p> before the <ul> and leaves a stray </p>. */
+
+.fh5co-social-wrap {
+	margin: 20px 0 0 0;
+}
+
+.fh5co-social-wrap .fh5co-social-icons {
+	margin-bottom: 0;
+}
+
+/* --- Timeline bullet lists ------------------------------------------------ */
+
+.timeline-body ul {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.timeline-body ul li {
+	position: relative;
+	padding-left: 20px;
+	margin-bottom: 12px;
+	line-height: 1.65;
+}
+
+.timeline-body ul li:last-child {
+	margin-bottom: 0;
+}
+
+.timeline-body ul li:before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 10px;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: #FF9000;
+}
+
+/* --- Technical strengths --------------------------------------------------
+   Replaces the template's percentage charts and progress bars. Those needed
+   invented numbers; these are the categories straight off the resume. */
+
+.skill-group {
+	margin-bottom: 40px;
+}
+
+.skill-group h3 {
+	font-size: 13px;
+	text-transform: uppercase;
+	letter-spacing: 2px;
+	color: #828282;
+	margin: 0 0 16px 0;
+}
+
+.skill-tags {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.skill-tags li {
+	display: inline-block;
+	padding: 7px 16px;
+	border: 1px solid #d9d9d9;
+	border-radius: 2px;
+	font-size: 14px;
+	color: #4d4d4d;
+	background: #fff;
+	line-height: 1.4;
+}
+
+/* --- Work tiles without screenshots ---------------------------------------
+   The template's .work tiles hide their caption behind opacity:0 until hover,
+   which only makes sense when there's a photo underneath to look at. These
+   flat tiles have no image, so the caption stays visible. Swap a tile back to
+   the photo treatment by removing .work--flat and adding a background-image. */
+
+.work--flat {
+	background: #2F3C4F;
+	display: table;
+	width: 100%;
+}
+
+.work--flat .desc {
+	opacity: 1;
+	background: transparent;
+	padding: 0 22px;
+}
+
+.work--flat .desc h3 {
+	color: #fff;
+	-webkit-transform: none;
+	transform: none;
+	margin-bottom: 8px;
+	line-height: 1.3;
+}
+
+.work--flat .desc span {
+	color: rgba(255, 255, 255, .75);
+	-webkit-transform: none;
+	transform: none;
+	font-size: 13px;
+}
+
+.work--flat .desc span i {
+	margin-left: 4px;
+	font-size: 11px;
+}
+
+/* Only the tiles that actually go somewhere get a hover affordance. */
+a.work--link {
+	transition: background .25s ease;
+}
+
+a.work--link:hover,
+a.work--link:focus {
+	background: #3b4c64;
+}
+
+a.work--link:focus {
+	outline: 2px solid #fff;
+	outline-offset: -4px;
+}
+
+/* --- Contrast fix ---------------------------------------------------------
+   .fh5co-bg-dark is misnamed: style.css:309-312 sets #2F3C4F then immediately
+   overrides it with #FF9000, so the section renders orange. The template only
+   lightens the subheading text for #fh5co-started, leaving #fh5co-work at
+   #828282 on orange — a 1.69:1 ratio. #111 on #FF9000 is 8.31:1. */
+
+#fh5co-work .fh5co-heading p {
+	color: #111;
+}
