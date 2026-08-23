@@ -21,7 +21,7 @@ git add -A && git commit -m "Update site" && git push
 
 ## Where things are
 
-- `index.html` — the whole site. Unfilled spots are marked `TODO:`.
+- `index.html` — the whole site.
 - `css/custom.css` — my overrides. `css/style.css` is the template's.
 - `images/` — `profile.jpg`, `cover.jpg`, `project-1..8.jpg`, `writing-1..3.jpg`.
 - `files/` — files to link to from the portfolio.
