@@ -410,3 +410,15 @@ a.work:focus-visible .desc span {
 		transform: none;
 	}
 }
+
+
+/* --- What I Do tiles: kill the template's shrink-wrap float ----------------
+   style.css:233 floats each .feature-left with no width, so in the stacked
+   single-column layout a tile shrinks to its text width and hugs the left
+   edge -- visible on the shortest tile (Live-Site Reliability). The float
+   does nothing useful at any width. */
+
+#fh5co-features .feature-left {
+	float: none;
+	width: 100%;
+}
