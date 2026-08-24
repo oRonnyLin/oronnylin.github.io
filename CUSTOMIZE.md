@@ -3,6 +3,11 @@
 Content lives in `index.html`. Styles I added live in `css/custom.css`.
 `css/style.css` is the template's — leave it alone so it stays diffable.
 
+After editing any CSS, bump the `?v=` number on the stylesheet links in
+`index.html` and `404.html` (e.g. `?v=2` → `?v=3`). Browsers cache CSS
+aggressively — this is what makes your edits actually show up, locally
+and on the live site.
+
 ## Adding a project
 
 Copy a `.work--flat` tile in the Selected Work section:
