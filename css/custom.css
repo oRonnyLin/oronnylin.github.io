@@ -422,3 +422,14 @@ a.work:focus-visible .desc span {
 	float: none;
 	width: 100%;
 }
+
+
+/* --- Contact-side panel: bottom-anchored window onto the cover photo -------
+   The template centers it (style.css ~932), which shows the photo's middle.
+   Anchoring to the bottom matches the hero's crop, so both backdrops read as
+   the same rooftop line. No parallax on this element, so CSS positioning
+   holds — unlike the hero, which needed a hard crop. */
+
+#fh5co-consult .video {
+	background-position: center bottom;
+}
