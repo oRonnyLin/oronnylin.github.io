@@ -344,3 +344,69 @@ a.work:focus-visible .desc span {
 #fh5co-started .overlay {
 	display: none;
 }
+
+
+/* --- Photography grid -----------------------------------------------------
+   Uniform square crops so mixed portrait/landscape shots read as one set;
+   clicking opens the uncropped original. -------------------------------- */
+
+#fh5co-photos {
+	padding: 7em 0;
+	background: #fff;
+	clear: both;
+	float: left;
+	width: 100%;
+}
+
+@media screen and (max-width: 768px) {
+	#fh5co-photos {
+		padding: 4em 0;
+	}
+}
+
+.photo-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 12px;
+}
+
+@media screen and (max-width: 768px) {
+	.photo-grid {
+		grid-template-columns: repeat(2, 1fr);
+		gap: 8px;
+	}
+}
+
+.photo-grid a {
+	display: block;
+	overflow: hidden;
+	border-radius: 2px;
+}
+
+.photo-grid img {
+	display: block;
+	width: 100%;
+	aspect-ratio: 1 / 1;
+	object-fit: cover;
+	transition: transform .35s ease, opacity .35s ease;
+}
+
+.photo-grid a:hover img,
+.photo-grid a:focus img {
+	transform: scale(1.03);
+	opacity: .92;
+}
+
+.photo-grid a:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.photo-grid img {
+		transition: none;
+	}
+	.photo-grid a:hover img {
+		transform: none;
+	}
+}
