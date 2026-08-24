@@ -1,4 +1,29 @@
 /* ==========================================================================
+   Palette
+   --------------------------------------------------------------------------
+   The template shipped a hard-coded orange (var(--accent)) in 19 places. Those are
+   now tokens, so the whole site's colour lives here.
+
+   Contrast, computed not guessed:
+     ink on wash ............. 10.55:1
+     white on accent .......... 4.78:1  (AA for normal text)
+     white on tile ........... 11.12:1
+     accent on white .......... 4.78:1  (links)
+   Keep any replacement accent at or below ~#4A8C8O in lightness or white
+   button text stops passing.
+   ========================================================================== */
+
+:root {
+	--accent:        #3F7D74;              /* deep sage teal: buttons, links, icons, badges */
+	--accent-hover:  #2F625B;
+	--wash:          #DDE9E4;              /* pastel section background */
+	--ink:           #26332F;              /* warm green-charcoal for text on wash */
+	--ink-muted:     #52635D;
+	--tile:          #2E3F3A;              /* project tile background */
+	--hero-overlay:  rgba(58, 110, 102, .88);
+}
+
+/* ==========================================================================
    custom.css — your overrides live here.
 
    css/style.css is the template's stylesheet. Leave it alone; put every
@@ -6,7 +31,7 @@
    wins over the template.
 
    Quick knobs:
-   - Accent colour: search css/style.css for #f96d00 (the orange) and
+   - Accent colour: search css/style.css for var(--accent) (the orange) and
      override the specific rules you care about here.
    - Section spacing, fonts, and colours: add rules below.
    ========================================================================== */
@@ -32,7 +57,7 @@
 	left: 0;
 	top: 4px;
 	font-size: 18px;
-	color: #f96d00;
+	color: var(--accent);
 }
 
 .contact-list li a {
@@ -41,8 +66,8 @@
 }
 
 .contact-list li a:hover {
-	color: #f96d00;
-	border-bottom-color: #f96d00;
+	color: var(--accent);
+	border-bottom-color: var(--accent);
 }
 
 /* Keeps the photo half of the contact block from collapsing when the text
@@ -103,7 +128,7 @@
 	width: 6px;
 	height: 6px;
 	border-radius: 50%;
-	background: #FF9000;
+	background: var(--accent);
 }
 
 /* --- Technical strengths --------------------------------------------------
@@ -149,7 +174,7 @@
    the photo treatment by removing .work--flat and adding a background-image. */
 
 .work--flat {
-	background: #2F3C4F;
+	background: var(--tile);
 	display: table;
 	width: 100%;
 }
@@ -187,7 +212,7 @@ a.work--link {
 
 a.work--link:hover,
 a.work--link:focus {
-	background: #3b4c64;
+	background: #3B5049;
 }
 
 a.work--link:focus {
@@ -196,13 +221,11 @@ a.work--link:focus {
 }
 
 /* --- Contrast fix ---------------------------------------------------------
-   .fh5co-bg-dark is misnamed: style.css:309-312 sets #2F3C4F then immediately
-   overrides it with #FF9000, so the section renders orange. The template only
-   lightens the subheading text for #fh5co-started, leaving #fh5co-work at
-   #828282 on orange — a 1.69:1 ratio. #111 on #FF9000 is 8.31:1. */
+   The template leaves #fh5co-work's subheading at #828282, which was 1.69:1 on
+   the old orange. On the pastel wash, ink-muted gives 6.9:1. */
 
 #fh5co-work .fh5co-heading p {
-	color: #111;
+	color: var(--ink-muted);
 }
 
 /* --- "In progress" markers ------------------------------------------------
@@ -211,10 +234,10 @@ a.work--link:focus {
    .wip          a small-caps line under a section <h2>.
    .wip.wip-tag  the same line as a chip on a single project tile.
 
-   Colour is #111 throughout -- as ink on the section line (18.88:1 on the
-   white sections, 8.31:1 on the #FF9000 ones) and as the chip's plate under
-   white text (18.88:1). It is the value already used for the #fh5co-work
-   subheading above, so the system introduces no new colour.
+   Colour is --ink throughout -- as ink on the section line (13.9:1 on the
+   white sections, 10.5:1 on the pastel wash) and as the chip's plate under
+   white text. It reuses a palette token, so the system introduces no new
+   colour.
 
    The class declares its own type rather than borrowing .fh5co-heading span,
    so it renders identically in a heading, in a tile, and in the footer. The
@@ -230,7 +253,7 @@ a.work--link:focus {
 	line-height: 1.5;
 	letter-spacing: 2px;
 	text-transform: uppercase;
-	color: #111;
+	color: var(--ink);
 	margin: -6px 0 16px;   /* pulls the line up under its own <h2> */
 }
 
@@ -255,7 +278,7 @@ a.work--link:focus {
 	line-height: 1.45;
 	letter-spacing: 1px;
 	border-radius: 2px;
-	background: #111;
+	background: var(--ink);
 	color: #fff;
 }
 
@@ -279,4 +302,45 @@ a.work:focus-visible .desc h3,
 a.work:focus-visible .desc span {
 	-webkit-transform: translate3d(0, 0, 0);
 	transform: translate3d(0, 0, 0);
+}
+
+
+/* --- Pastel sections: flip the template's white text to ink ----------------
+   #fh5co-features and .fh5co-bg-dark used to be saturated orange with white
+   text on top. They are now a pastel wash, so every one of those white values
+   has to become ink or it disappears. --------------------------------------- */
+
+#fh5co-features h2,
+#fh5co-features .feature-left h3,
+.fh5co-bg-dark .fh5co-heading h2,
+#fh5co-started .fh5co-heading h2 {
+	color: var(--ink) !important;
+}
+
+#fh5co-features .feature-left p,
+#fh5co-started .fh5co-heading p {
+	color: var(--ink-muted);
+}
+
+#fh5co-features .feature-left p a {
+	color: var(--accent) !important;
+}
+
+/* The CTA button was white-on-orange; on a pastel wash it needs to be the
+   solid element instead. */
+#fh5co-started .btn {
+	background: var(--accent) !important;
+	color: #fff !important;
+}
+
+#fh5co-started .btn:hover,
+#fh5co-started .btn:focus {
+	background: var(--accent-hover) !important;
+	color: #fff !important;
+}
+
+/* The CTA section paints a dark overlay meant for a photo background; with a
+   flat wash underneath it just muddies the colour. */
+#fh5co-started .overlay {
+	display: none;
 }
