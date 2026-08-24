@@ -1,7 +1,9 @@
 # Editing notes
 
 Content lives in `index.html`. Styles I added live in `css/custom.css`.
-`css/style.css` is the template's — leave it alone so it stays diffable.
+`css/style.css` is the template's, lightly tokenized to CSS variables during
+the repalette — don't restore a "pristine" copy or the palette reverts to
+orange. Colour changes go in the `:root` block of `css/custom.css`.
 
 After editing any CSS, bump the `?v=` number on the stylesheet links in
 `index.html` and `404.html` (e.g. `?v=2` → `?v=3`). Browsers cache CSS
@@ -47,7 +49,7 @@ Copy a `<li>` in the timeline. Alternate `timeline-unverted` and
 
 ## Skills
 
-Three `.skill-group` blocks, each a plain `<ul class="skill-tags">`. Add an
+The `.skill-group` blocks are each a plain `<ul class="skill-tags">`. Add an
 `<li>`. These replaced the template's percentage charts, which needed made-up
 numbers.
 

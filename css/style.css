@@ -1115,8 +1115,8 @@ input[type="text"] {
   border: 2px solid var(--accent);
 }
 .btn-primary:hover, .btn-primary:focus, .btn-primary:active {
-  background: #ff9b1a !important;
-  border-color: #ff9b1a !important;
+  background: var(--accent-hover) !important;
+  border-color: var(--accent-hover) !important;
 }
 .btn-primary.btn-outline {
   background: transparent;
