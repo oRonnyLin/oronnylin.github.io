@@ -25,11 +25,11 @@
 	<link href="https://fonts.googleapis.com/css?family=Space+Mono" rel="stylesheet">
 	<link href="https://fonts.googleapis.com/css?family=Kaushan+Script" rel="stylesheet">
 
-	<link rel="stylesheet" href="css/animate.css?v=10">
-	<link rel="stylesheet" href="css/icomoon.css?v=10">
-	<link rel="stylesheet" href="css/bootstrap.css?v=10">
-	<link rel="stylesheet" href="css/style.css?v=10">
-	<link rel="stylesheet" href="css/custom.css?v=10">
+	<link rel="stylesheet" href="css/animate.css?v=11">
+	<link rel="stylesheet" href="css/icomoon.css?v=11">
+	<link rel="stylesheet" href="css/bootstrap.css?v=11">
+	<link rel="stylesheet" href="css/style.css?v=11">
+	<link rel="stylesheet" href="css/custom.css?v=11">
 
 	<script src="js/modernizr-2.6.2.min.js"></script>
 	<!--[if lt IE 9]>
@@ -316,7 +316,7 @@
 				<div class="col-md-8 col-md-offset-2 text-center fh5co-heading">
 					<h2>Photography</h2>
 					<span class="wip">Nature, Street, Life</span>
-					<p>I enjoy capturing nature and documenting events. These are some of the photos that I&rsquo;ve taken in Taiwan, Japan, and Canada.</p>
+					<p>These are some photos that I&rsquo;ve taken in Taiwan, Japan, and Canada.</p>
 				</div>
 			</div>
 			<div class="row animate-box">
@@ -335,8 +335,10 @@
 	</div>
 
 	<div id="fh5co-consult">
-		<div class="video fh5co-video" style="background-image: url(images/cover.jpg?v=2);">
+		<div class="video fh5co-video" style="background-image: url(images/cover.jpg?v=2);"
+			role="button" tabindex="0" aria-label="View photo: Houbi, Tainan">
 			<div class="overlay"></div>
+			<span class="photo-cap">Houbi &middot; Tainan, Taiwan</span>
 		</div>
 		<div class="choose animate-box">
 			<h2>Contact</h2>
@@ -452,6 +454,16 @@
 				openBox(a.getAttribute('href'), t ? t.alt : '', c ? c.textContent : '');
 			});
 		});
+		var panel = document.querySelector('#fh5co-consult .video');
+		if (panel) {
+			function openPanel() {
+				openBox('images/cover.jpg?v=2', 'Rainbow over tiled rooftops in Houbi, Tainan', 'Houbi \u00b7 Tainan, Taiwan');
+			}
+			panel.addEventListener('click', openPanel);
+			panel.addEventListener('keydown', function (e) {
+				if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPanel(); }
+			});
+		}
 		box.addEventListener('click', function (e) { if (e.target !== img) closeBox(); });
 		closeBtn.addEventListener('click', closeBox);
 		document.addEventListener('keydown', function (e) {

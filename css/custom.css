@@ -619,3 +619,35 @@ a:focus-visible {
 #lightbox-cap:empty {
 	display: none;
 }
+
+/* --- Experience & Education on the wash ------------------------------------
+   With What I Do gone, three white sections ran in a row; the timeline
+   carries the wash to restore the alternation. Panels are transparent in
+   the template, so only the spine tone needs to follow. */
+
+#fh5co-resume {
+	background: var(--wash);
+}
+
+#fh5co-resume .timeline:before {
+	background-color: #C2D4CC;
+}
+
+/* --- Contact panel: caption + click-through to the full photo --------------
+   The bottom-anchored crop hides the rainbow; clicking opens the full
+   portrait in the lightbox. Caption follows the photo-grid mechanism. */
+
+#fh5co-consult .video {
+	cursor: zoom-in;
+}
+
+#fh5co-consult .video:hover .photo-cap,
+#fh5co-consult .video:focus-visible .photo-cap {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+#fh5co-consult .video:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: -4px;
+}
