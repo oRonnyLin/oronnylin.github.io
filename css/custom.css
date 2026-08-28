@@ -589,3 +589,75 @@ a:focus-visible {
 	outline: 2px solid #fff;
 	outline-offset: 2px;
 }
+
+/* --- Photo captions --------------------------------------------------------
+   Place labels rise over a bottom gradient on hover/focus; always visible
+   on touch widths, where hover doesn't exist. */
+
+.photo-grid a {
+	position: relative;
+}
+
+.photo-cap {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	padding: 26px 12px 10px;
+	background: linear-gradient(180deg, rgba(16, 24, 22, 0), rgba(16, 24, 22, .8));
+	color: #fff;
+	font-family: "Space Mono", Menlo, Consolas, monospace;
+	font-size: 12px;
+	letter-spacing: 1px;
+	text-align: left;
+	opacity: 0;
+	transform: translateY(6px);
+	transition: opacity .3s ease, transform .3s ease;
+	pointer-events: none;
+}
+
+.photo-grid a:hover .photo-cap,
+.photo-grid a:focus-visible .photo-cap {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+@media screen and (max-width: 768px) {
+	.photo-cap {
+		opacity: 1;
+		transform: none;
+		font-size: 11px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.photo-cap {
+		transition: none;
+		transform: none;
+	}
+}
+
+/* Lightbox caption under the opened photo. */
+#lightbox figure {
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+	max-width: 92vw;
+}
+
+#lightbox figure img {
+	max-height: 86vh;
+}
+
+#lightbox-cap {
+	color: rgba(255, 255, 255, .85);
+	font-family: "Space Mono", Menlo, Consolas, monospace;
+	font-size: 13px;
+	letter-spacing: 1px;
+}
+
+#lightbox-cap:empty {
+	display: none;
+}

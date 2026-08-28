@@ -25,11 +25,11 @@
 	<link href="https://fonts.googleapis.com/css?family=Space+Mono" rel="stylesheet">
 	<link href="https://fonts.googleapis.com/css?family=Kaushan+Script" rel="stylesheet">
 
-	<link rel="stylesheet" href="css/animate.css?v=8">
-	<link rel="stylesheet" href="css/icomoon.css?v=8">
-	<link rel="stylesheet" href="css/bootstrap.css?v=8">
-	<link rel="stylesheet" href="css/style.css?v=8">
-	<link rel="stylesheet" href="css/custom.css?v=8">
+	<link rel="stylesheet" href="css/animate.css?v=9">
+	<link rel="stylesheet" href="css/icomoon.css?v=9">
+	<link rel="stylesheet" href="css/bootstrap.css?v=9">
+	<link rel="stylesheet" href="css/style.css?v=9">
+	<link rel="stylesheet" href="css/custom.css?v=9">
 
 	<script src="js/modernizr-2.6.2.min.js"></script>
 	<!--[if lt IE 9]>
@@ -387,18 +387,18 @@
 				<div class="col-md-8 col-md-offset-2 text-center fh5co-heading">
 					<h2>Photography</h2>
 					<span class="wip">Nature, Street, Life</span>
-					<p>I like to take photos of nature and document events around me. These are some of the photos that I&rsquo;ve taken in Taiwan, Japan, and Canada.</p>
+					<p>I enjoy capturing nature and documenting events. These are some of the photos that I&rsquo;ve taken in Taiwan, Japan, and Canada.</p>
 				</div>
 			</div>
 			<div class="row animate-box">
 				<div class="col-md-12">
 					<div class="photo-grid">
-						<a href="images/photos/photo-1.jpg" target="_blank" rel="noopener"><img src="images/photos/photo-1.jpg" alt="Figures walking through circles of dappled sunlight on a forest floor" loading="lazy"></a>
-						<a href="images/photos/photo-2.jpg" target="_blank" rel="noopener"><img src="images/photos/photo-2.jpg" alt="Morning fog flowing over layered mountain ridges at sunrise" loading="lazy"></a>
-						<a href="images/photos/photo-6.jpg" target="_blank" rel="noopener"><img src="images/photos/photo-6.jpg" alt="Tunnel of vermilion torii gates at Fushimi Inari, Kyoto" loading="lazy"></a>
-						<a href="images/photos/photo-3.jpg" target="_blank" rel="noopener"><img src="images/photos/photo-3.jpg" alt="Blue-hazed mountain ridges receding toward a lake in the valley" loading="lazy"></a>
-						<a href="images/photos/photo-4.jpg" target="_blank" rel="noopener"><img src="images/photos/photo-4.jpg" alt="Blue forget-me-not flowers against dark green leaves" loading="lazy"></a>
-						<a href="images/photos/photo-5.jpg" target="_blank" rel="noopener"><img src="images/photos/photo-5.jpg" alt="A bride’s hand resting on the groom’s arm, bouquet in the foreground" loading="lazy"></a>
+						<a href="images/photos/photo-1.jpg" target="_blank" rel="noopener"><img src="images/photos/photo-1.jpg" alt="Figures walking through circles of dappled sunlight on a forest floor" loading="lazy"><span class="photo-cap">Vallea Lumina &middot; Whistler, B.C.</span></a>
+						<a href="images/photos/photo-2.jpg" target="_blank" rel="noopener"><img src="images/photos/photo-2.jpg" alt="Morning fog flowing over layered mountain ridges at sunrise" loading="lazy"><span class="photo-cap">Erliao &middot; Tainan, Taiwan</span></a>
+						<a href="images/photos/photo-6.jpg" target="_blank" rel="noopener"><img src="images/photos/photo-6.jpg" alt="Tunnel of vermilion torii gates at Fushimi Inari, Kyoto" loading="lazy"><span class="photo-cap">Senbon Torii &middot; Kyoto, Japan</span></a>
+						<a href="images/photos/photo-3.jpg" target="_blank" rel="noopener"><img src="images/photos/photo-3.jpg" alt="Blue-hazed mountain ridges receding toward a lake in the valley" loading="lazy"><span class="photo-cap">Cheam Peak &middot; B.C.</span></a>
+						<a href="images/photos/photo-4.jpg" target="_blank" rel="noopener"><img src="images/photos/photo-4.jpg" alt="Blue forget-me-not flowers against dark green leaves" loading="lazy"><span class="photo-cap">VanDusen Garden &middot; Vancouver</span></a>
+						<a href="images/photos/photo-5.jpg" target="_blank" rel="noopener"><img src="images/photos/photo-5.jpg" alt="A bride’s hand resting on the groom’s arm, bouquet in the foreground" loading="lazy"><span class="photo-cap">Friend&rsquo;s Wedding</span></a>
 					</div>
 				</div>
 			</div>
@@ -453,7 +453,10 @@
 
 	<div id="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer" hidden>
 		<button id="lightbox-close" type="button" aria-label="Close photo">&times;</button>
-		<img id="lightbox-img" src="" alt="">
+		<figure>
+			<img id="lightbox-img" src="" alt="">
+			<figcaption id="lightbox-cap"></figcaption>
+		</figure>
 	</div>
 
 	<script src="js/jquery.min.js"></script>
@@ -509,15 +512,17 @@
 		var img = document.getElementById('lightbox-img');
 		var closeBtn = document.getElementById('lightbox-close');
 		var lastFocus = null;
-		function openBox(href, alt) {
+		var cap = document.getElementById('lightbox-cap');
+		function openBox(href, alt, caption) {
 			img.src = href; img.alt = alt || '';
+			cap.textContent = caption || '';
 			box.hidden = false;
 			document.body.style.overflow = 'hidden';
 			lastFocus = document.activeElement;
 			closeBtn.focus();
 		}
 		function closeBox() {
-			box.hidden = true; img.src = '';
+			box.hidden = true; img.src = ''; cap.textContent = '';
 			document.body.style.overflow = '';
 			if (lastFocus) lastFocus.focus();
 		}
@@ -526,7 +531,8 @@
 				if (e.metaKey || e.ctrlKey || e.shiftKey) return;
 				e.preventDefault();
 				var t = a.querySelector('img');
-				openBox(a.getAttribute('href'), t ? t.alt : '');
+				var c = a.querySelector('.photo-cap');
+				openBox(a.getAttribute('href'), t ? t.alt : '', c ? c.textContent : '');
 			});
 		});
 		box.addEventListener('click', function (e) { if (e.target !== img) closeBox(); });
