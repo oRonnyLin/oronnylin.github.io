@@ -25,6 +25,7 @@ git add -A && git commit -m "Update site" && git push
 - `css/custom.css` — my overrides. `css/style.css` is the template's.
 - `images/` — `profile.jpg`, `cover.jpg` (contact panel), `cover-wide.jpg` (hero), `photos/photo-1..6.jpg`.
 - `files/` — files to link to from the portfolio.
+- `demos/` — self-contained interactive demos linked from Selected Work.
 
 ---
 

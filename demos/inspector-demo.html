@@ -1,0 +1,3880 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Inspector — interactive UI demo</title>
+<!--
+  Inspector — static UI demo.
+
+  A self-contained, client-only reproduction of the Inspector desktop app's
+  interface. No backend, no network, no real telemetry: every row is generated
+  in the browser, and all hosts / endpoints / class names are fictional
+  ("Contoso Live"). Drop it anywhere and embed it with:
+
+      <iframe src="inspector-demo.html" style="width:100%;height:720px;border:0"></iframe>
+
+  Everything below is vanilla HTML/CSS/JS — no framework, no build step.
+-->
+<style>
+/* ── Fluent UI v9 webLightTheme tokens ───────────────────────────────────── */
+:root {
+  --bg1: #ffffff;
+  --bg1Hover: #f5f5f5;
+  --bg1Pressed: #e0e0e0;
+  --bg2: #fafafa;
+  --bg2Hover: #f0f0f0;
+  --bg2Selected: #e6e6e6;
+  --bg3: #f5f5f5;
+  --bg3Hover: #ebebeb;
+  --bg4: #f0f0f0;
+  --bg6: #e6e6e6;
+  --fg1: #242424;
+  --fg2: #424242;
+  --fg3: #616161;
+  --fg4: #707070;
+  --fgDisabled: #bdbdbd;
+  --fgOnBrand: #ffffff;
+  --stroke1: #d1d1d1;
+  --stroke1Hover: #c7c7c7;
+  --stroke2: #e0e0e0;
+  --stroke3: #f0f0f0;
+  --brandFg1: #0f6cbd;
+  --brandFg2: #115ea3;
+  --brandBg: #0f6cbd;
+  --brandBgHover: #115ea3;
+  --brandBg2: #ebf3fc;
+  --brandStroke1: #0f6cbd;
+  --brandStroke2: #b4d6fa;
+  --green: #0e700e;
+  --greenBg3: #107c10;
+  --red: #b10e1c;
+  --marigold: #eaa300;
+  --r-sm: 2px;
+  --r-md: 4px;
+  --r-lg: 6px;
+  --r-circ: 10000px;
+  --shadow4: 0 0 2px rgba(0,0,0,.12), 0 2px 4px rgba(0,0,0,.14);
+  --shadow8: 0 0 2px rgba(0,0,0,.12), 0 4px 8px rgba(0,0,0,.14);
+  --shadow16: 0 0 2px rgba(0,0,0,.12), 0 8px 16px rgba(0,0,0,.14);
+  --font: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
+  --mono: 'Cascadia Mono', 'Consolas', 'SF Mono', Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font);
+  background-color: var(--bg2);
+  color: var(--fg1);
+  overflow: hidden;
+  font-size: 14px;
+}
+
+/* Thin scrollbars: the thumb is invisible at rest and only appears while the
+   element is actively scrolling (the `is-scrolling` class is toggled globally)
+   or while hovered, so scrollbars take no visual space while reading. */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
+.is-scrolling::-webkit-scrollbar-thumb { background: #c4c4c4; }
+::-webkit-scrollbar-thumb:hover { background: #9a9a9a; }
+
+/* Firefox has no ::-webkit-scrollbar; give its scroll containers the thin
+   variant so they read the same, just without the auto-hide. */
+@supports (scrollbar-width: thin) {
+  .x-scroller, .x-detailbody, .x-popover, .x-menu, .x-rulelist, .x-mutelist, .x-payload {
+    scrollbar-width: thin;
+    scrollbar-color: #c4c4c4 transparent;
+  }
+}
+
+button { font-family: inherit; }
+input, select, textarea { font-family: inherit; }
+
+/* ── App shell ───────────────────────────────────────────────────────────── */
+#app { display: flex; flex-direction: column; height: 100vh; min-height: 0; background: var(--bg2); }
+.x-body { flex: 1; display: flex; min-height: 0; min-width: 0; overflow: hidden; }
+.x-tablewrap { flex: 1; min-width: 0; min-height: 0; display: flex; }
+
+/* ── Generic Fluent-ish button ───────────────────────────────────────────── */
+.f-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 32px; height: 32px; padding: 0 12px;
+  border: 1px solid var(--stroke1); border-radius: var(--r-md);
+  background: var(--bg1); color: var(--fg1);
+  font-size: 14px; font-weight: 600; line-height: 20px; cursor: pointer;
+  white-space: nowrap;
+}
+.f-btn:hover { background: var(--bg1Hover); border-color: var(--stroke1Hover); }
+.f-btn:active { background: var(--bg1Pressed); }
+.f-btn[disabled] { color: var(--fgDisabled); background: var(--bg4); border-color: var(--stroke2); cursor: default; }
+.f-btn[disabled] svg { opacity: .45; }
+.f-btn.icon-only { padding: 0; width: 32px; }
+.f-btn.primary { background: var(--brandBg); border-color: transparent; color: var(--fgOnBrand); }
+.f-btn.primary:hover { background: var(--brandBgHover); }
+.f-btn.primary[disabled] { background: var(--bg4); color: var(--fgDisabled); }
+.f-btn.subtle { background: transparent; border-color: transparent; color: var(--fg2); }
+.f-btn.subtle:hover { background: var(--bg1Hover); color: var(--fg1); }
+.f-btn.subtle[disabled] { background: transparent; border-color: transparent; color: var(--fgDisabled); }
+.f-btn.sm { height: 24px; min-width: 24px; padding: 0 8px; font-size: 12px; line-height: 16px; }
+.f-btn.sm.icon-only { width: 24px; padding: 0; }
+.f-btn.checked { background: var(--brandBg2); color: var(--brandFg1); }
+.f-btn.checked:hover { background: var(--brandBg2); }
+.f-btn svg { flex-shrink: 0; }
+
+/* ── Generic Fluent-ish input ────────────────────────────────────────────── */
+.f-input {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 24px; padding: 0 8px; min-width: 0;
+  background: var(--bg1); border: 1px solid var(--stroke1);
+  border-bottom-color: var(--fg4);
+  border-radius: var(--r-md);
+}
+.f-input.md { height: 32px; }
+.f-input:focus-within { border-bottom: 2px solid var(--brandStroke1); padding-bottom: 0; }
+.f-input > input {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  font-size: 12px; color: var(--fg1); padding: 0;
+}
+.f-input.md > input { font-size: 14px; }
+.f-input > input::placeholder { color: var(--fg4); }
+
+.f-select, .f-textarea {
+  background: var(--bg1); border: 1px solid var(--stroke1); border-bottom-color: var(--fg4);
+  border-radius: var(--r-md); color: var(--fg1); font-size: 12px; outline: none;
+}
+.f-select { height: 24px; padding: 0 6px; }
+.f-textarea { padding: 5px 8px; font-family: var(--mono); font-size: 11px; resize: vertical; width: 100%; }
+
+/* ── Fluent Switch ───────────────────────────────────────────────────────── */
+.f-switch {
+  position: relative; display: inline-flex; align-items: center; flex-shrink: 0;
+  width: 40px; height: 20px; border-radius: var(--r-circ);
+  border: 1px solid var(--fg3); background: transparent; padding: 0; cursor: pointer;
+}
+.f-switch::after {
+  content: ""; position: absolute; left: 3px; top: 50%; transform: translateY(-50%);
+  width: 14px; height: 14px; border-radius: 50%; background: var(--fg3);
+  transition: left 100ms ease, background 100ms ease;
+}
+.f-switch:hover { border-color: var(--fg2); }
+.f-switch:hover::after { background: var(--fg2); }
+.f-switch[aria-checked="true"] { background: var(--brandBg); border-color: transparent; }
+.f-switch[aria-checked="true"]::after { left: 23px; background: #fff; }
+.f-switch[disabled] { border-color: var(--fgDisabled); cursor: default; }
+.f-switch[disabled]::after { background: var(--fgDisabled); }
+.f-switch[disabled][aria-checked="true"] { background: var(--fgDisabled); }
+/* Armed chaos switch — marigold track instead of brand blue. */
+.f-switch.armed[aria-checked="true"] { background: var(--marigold); }
+
+/* ── Fluent Checkbox ─────────────────────────────────────────────────────── */
+.f-check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; color: var(--fg2); }
+.f-check .box {
+  width: 16px; height: 16px; border: 1px solid var(--fg3); border-radius: var(--r-sm);
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.f-check[aria-checked="true"] .box { background: var(--brandBg); border-color: var(--brandBg); color: #fff; }
+.f-check .box svg { display: none; }
+.f-check[aria-checked="true"] .box svg { display: block; }
+
+/* ── Divider ─────────────────────────────────────────────────────────────── */
+.f-divider { height: 1px; background: var(--stroke2); border: 0; margin: 2px 0; }
+
+/* ── Top bar ─────────────────────────────────────────────────────────────── */
+.x-topbar {
+  display: flex; align-items: center; flex-wrap: wrap;
+  column-gap: 8px; row-gap: 8px; padding: 8px 12px;
+  border-bottom: 1px solid var(--stroke2); background: var(--bg1); flex-shrink: 0;
+}
+.x-mark { display: inline-flex; align-items: center; color: var(--brandFg1); flex-shrink: 0; cursor: default; user-select: none; }
+.x-leftgroup { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.x-zone { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.x-vdiv { width: 1px; height: 20px; background: var(--stroke2); flex-shrink: 0; margin: 0 2px; }
+.x-minidiv { width: 1px; height: 16px; background: var(--stroke2); flex-shrink: 0; }
+.x-filtergroup { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 260px; }
+.x-searchbox { flex: 1; min-width: 180px; }
+.x-contentafter { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.x-findnav { display: inline-flex; align-items: center; gap: 2px; }
+.x-findcount { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; white-space: nowrap; padding-right: 2px; }
+.x-findnavbtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: transparent; cursor: pointer; color: var(--fg2);
+  padding: 2px; border-radius: var(--r-sm);
+}
+.x-findnavbtn:hover { background: var(--bg1Hover); }
+.x-findnavbtn[disabled] { color: var(--fgDisabled); cursor: default; background: transparent; }
+
+/* Segmented Logs | Both | Network */
+.x-segmented {
+  display: inline-flex; height: 28px; border: 1px solid var(--stroke1);
+  border-radius: var(--r-md); overflow: hidden; flex-shrink: 0;
+}
+.x-segment {
+  border: none; border-right: 1px solid var(--stroke2); background: transparent;
+  padding: 0 10px; height: 100%; font-size: 12px; font-family: var(--font);
+  color: var(--fg2); cursor: pointer; display: inline-flex; align-items: center;
+}
+.x-segment:last-child { border-right: none; }
+.x-segment:hover { background: var(--bg1Hover); }
+.x-segment.active { background: var(--brandBg2); color: var(--brandFg1); font-weight: 600; }
+.x-segment.active:hover { background: var(--brandBg2); }
+
+/* Capture button corner badge */
+.x-capturebtn { position: relative; overflow: visible; }
+.x-badge {
+  position: absolute; top: -3px; right: -3px;
+  min-width: 16px; height: 16px; box-sizing: border-box; padding: 0 4px;
+  border-radius: 999px; background: var(--brandBg); color: var(--fgOnBrand);
+  font-size: 10px; font-weight: 600; line-height: 16px; font-variant-numeric: tabular-nums;
+  display: inline-flex; align-items: center; justify-content: center;
+  pointer-events: none; box-shadow: 0 0 0 1.5px var(--bg1);
+}
+.x-badge.armed { background: var(--marigold); color: var(--fg1); }
+.x-badge.dot { min-width: 10px; width: 10px; height: 10px; padding: 0; }
+
+/* MCP on-dot */
+.x-mcpwrap { position: relative; display: inline-flex; }
+.x-mcpdot {
+  position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--greenBg3); box-shadow: 0 0 0 1.5px var(--bg1); pointer-events: none; z-index: 1;
+}
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
+.x-table { flex: 1; display: flex; flex-direction: column; background: var(--bg1); min-width: 0; min-height: 0; position: relative; }
+.x-headerviewport { flex-shrink: 0; overflow: hidden; }
+.x-headerscroll { will-change: transform; }
+.x-headerrow {
+  display: flex; align-items: stretch; height: 26px;
+  font-size: 10.5px; font-weight: 600; color: var(--fg3);
+  text-transform: uppercase; letter-spacing: .5px;
+  border-bottom: 1px solid var(--stroke2); background: var(--bg2);
+  user-select: none; flex-shrink: 0; padding-left: 8px;
+}
+.x-hcell { position: relative; display: flex; align-items: center; flex-shrink: 0; padding-left: 4px; }
+.x-hcell.flex { flex: 1; min-width: 0; }
+.x-hlabel { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding-right: 6px; cursor: pointer; flex: 1; min-width: 0; }
+.x-hlabel.disabled { cursor: default; }
+.x-sortglyph { font-size: 9px; margin-left: 2px; color: var(--fg2); }
+.x-resize {
+  position: absolute; top: 0; right: -4px; width: 8px; height: 100%;
+  cursor: col-resize; background: transparent; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+}
+.x-resize::after { content: ""; width: 1px; height: 14px; background: var(--stroke2); transition: background-color 80ms, height 80ms; }
+.x-resize:hover::after { background: var(--brandStroke1); height: 100%; }
+.x-resize.dragging::after { background: var(--brandStroke1); height: 100%; width: 2px; }
+
+.x-listwrap { flex: 1; min-height: 0; position: relative; }
+.x-scroller { position: absolute; inset: 0; overflow-x: hidden; overflow-y: auto; }
+.x-spacer { position: relative; width: 100%; }
+
+.x-row {
+  position: absolute; left: 0; display: flex; align-items: center;
+  height: 28px; padding: 0 8px;
+  font-family: var(--mono); font-size: 11.5px; cursor: pointer;
+  border-bottom: 1px solid var(--stroke3);
+}
+.x-row:hover { background: var(--bg1Hover); }
+.x-row.selected { background: var(--bg2Selected); }
+.x-row.match { background: rgba(255,196,0,.16); }
+.x-row.match.selected { background: rgba(255,196,0,.24); }
+.x-row.activematch { background: rgba(255,196,0,.34); box-shadow: inset 2px 0 0 #d9a400; }
+
+.x-cellwrap { display: flex; align-items: center; flex-shrink: 0; padding-left: 4px; min-width: 0; }
+.x-cellwrap.flex { flex: 1; min-width: 0; }
+.x-cell { padding-right: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.x-timecell { color: var(--fg3); }
+.x-tagcell { color: #0050a4; }
+.x-nettagcell { color: #038387; font-weight: 600; letter-spacing: .3px; }
+.x-hexcell { color: var(--fg4); font-size: 11px; }
+.x-sessioncell { color: var(--fg3); }
+.x-sourcecell { color: #605e5c; }
+.x-messagecell { color: var(--fg1); flex: 1; min-width: 0; }
+
+.x-pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0 5px; height: 16px; min-width: 44px; border-radius: 3px;
+  font-size: 9px; font-weight: 700; letter-spacing: .3px; border: 1px solid;
+  font-family: var(--mono);
+}
+
+.x-markerrow {
+  position: absolute; left: 0; display: flex; align-items: center; gap: 10px;
+  height: 28px; padding: 0 12px; font-family: var(--mono); font-size: 11px;
+  background: var(--bg3); border-top: 1px solid var(--brandStroke2); border-bottom: 1px solid var(--brandStroke2);
+}
+.x-markerlabel { color: var(--brandFg1); font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+.x-markerrule { flex: 1; height: 1px; background: var(--brandStroke2); }
+.x-markertime { color: var(--fg3); white-space: nowrap; flex-shrink: 0; }
+.x-runrow {
+  position: absolute; left: 0; display: flex; align-items: center; gap: 10px;
+  height: 28px; padding: 0 12px; font-family: var(--mono); font-size: 11px;
+  color: var(--fg3); background: var(--bg2);
+}
+.x-runrule { flex: 1; height: 1px; background: var(--stroke2); }
+
+.x-livepill {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  height: 28px; padding: 0 14px; border: none; border-radius: 14px;
+  background: var(--brandBg); color: var(--fgOnBrand);
+  font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .3px;
+  cursor: pointer; box-shadow: var(--shadow8);
+  display: inline-flex; align-items: center; gap: 6px; z-index: 4;
+}
+
+/* Row appended while pinned to the live tail gets a quiet opacity fade. */
+@keyframes rowEnter { from { opacity: 0; } to { opacity: 1; } }
+.row-entering { animation: rowEnter 160ms ease-out both; will-change: opacity; }
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.x-empty {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: var(--fg3); background: var(--bg1); padding: 32px; text-align: center;
+}
+.x-empty .glyph { font-size: 44px; margin-bottom: 16px; color: var(--brandFg1); user-select: none; }
+.x-empty .heading { font-size: 18px; font-weight: 600; color: var(--fg1); margin-bottom: 8px; }
+.x-empty .body { font-size: 13px; max-width: 460px; line-height: 1.5; }
+.x-empty ul { font-size: 12px; margin-top: 20px; color: var(--fg3); text-align: left; max-width: 460px; line-height: 1.7; }
+.x-empty code { font-family: var(--mono); font-size: 11px; background: var(--bg3); padding: 1px 4px; border-radius: 3px; }
+.x-empty .cta { margin-top: 22px; display: flex; gap: 8px; }
+
+.x-filteredhint {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  max-width: 440px; padding: 0 24px; text-align: center;
+}
+.x-filteredhint .heading { font-size: 14px; font-weight: 600; color: var(--fg2); }
+.x-filteredhint .sub { font-size: 12px; color: var(--fg3); line-height: 1.4; }
+.x-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 2px; }
+.x-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--stroke1); border-radius: var(--r-md);
+  background: var(--bg1); color: var(--fg2); font-size: 11.5px; font-family: var(--font);
+  padding: 3px 8px; cursor: pointer;
+}
+.x-chip:hover { background: var(--bg1Hover); border-color: var(--stroke1Hover); }
+.x-chip .xx { font-size: 10px; color: var(--fg3); }
+.x-reset { border: none; background: transparent; color: var(--brandFg1); font-size: 11.5px; cursor: pointer; padding: 2px 4px; }
+.x-reset:hover { text-decoration: underline; }
+.x-note { font-size: 11px; color: var(--fg3); line-height: 1.4; margin-top: 4px; }
+
+/* ── Details panel ───────────────────────────────────────────────────────── */
+.x-detail {
+  position: relative; display: flex; flex-direction: column;
+  background: var(--bg1); border-left: 1px solid var(--stroke2);
+  overflow: hidden; flex-shrink: 0;
+}
+.x-detailresize {
+  position: absolute; top: 0; left: -4px; width: 8px; height: 100%;
+  cursor: col-resize; background: transparent; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+}
+.x-detailresize::after { content: ""; width: 1px; height: 24px; background: var(--stroke2); transition: background-color 80ms, height 80ms; }
+.x-detailresize:hover::after, .x-detailresize.dragging::after { background: var(--brandStroke1); height: 100%; }
+.x-detailhdr {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 0 12px; border-bottom: 1px solid var(--stroke2); flex-shrink: 0; height: 40px;
+}
+.x-detailtitle { font-size: 13px; font-weight: 600; }
+.x-detailactions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.x-detailbody { flex: 1; overflow-y: auto; scrollbar-gutter: stable; padding: 12px; font-size: 12px; position: relative; }
+.x-field { display: grid; grid-template-columns: 108px 1fr; column-gap: 8px; row-gap: 4px; margin-bottom: 8px; align-items: baseline; }
+.x-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--fg3); font-weight: 600; }
+.x-value { font-family: var(--mono); color: var(--fg1); font-size: 11.5px; word-break: break-all; }
+.x-sectiontitle {
+  font-size: 11px; font-weight: 600; color: var(--fg3); text-transform: uppercase; letter-spacing: .5px;
+  margin-bottom: 4px; margin-top: 12px; display: flex; justify-content: space-between; align-items: center;
+}
+.x-collapse { cursor: pointer; user-select: none; }
+.x-collapse:hover { color: var(--fg2); }
+.x-payloadwrap { position: relative; margin: 8px 0; }
+.x-payload {
+  font-family: var(--mono); font-size: 11.5px; white-space: pre-wrap; overflow-wrap: anywhere;
+  background: var(--bg3); padding: 8px; border-radius: var(--r-md); color: var(--fg1);
+  overflow: auto; max-height: 60vh; margin: 0;
+}
+.x-muterow { display: flex; gap: 6px; margin: 8px 0 4px; }
+.x-urlvalue { font-family: var(--mono); font-size: 11.5px; color: var(--fg1); word-break: break-all; line-height: 1.45; }
+.x-headertable { display: grid; grid-template-columns: minmax(90px, auto) 1fr; column-gap: 10px; row-gap: 3px; font-family: var(--mono); font-size: 11px; background: var(--bg3); padding: 8px; border-radius: var(--r-md); }
+.x-hdrkey { color: var(--fg3); overflow-wrap: anywhere; }
+.x-hdrval { color: var(--fg1); overflow-wrap: anywhere; }
+.x-redacted { font-size: 10.5px; color: var(--fg3); margin-top: 6px; line-height: 1.4; }
+.x-chaosbanner {
+  display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin-bottom: 10px;
+  background: #fff8e6; border: 1px solid var(--marigold); border-radius: var(--r-md);
+}
+.x-chaostitle { font-size: 11.5px; font-weight: 700; color: #8a5a00; letter-spacing: .3px; }
+.x-chaosnote { font-size: 11px; color: #7a5200; line-height: 1.4; }
+.x-partrow { border-top: 1px solid var(--stroke2); padding-top: 6px; margin-top: 6px; }
+.x-partrow:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+.x-partmeta { font-size: 10.5px; color: var(--fg3); margin-bottom: 4px; font-family: var(--mono); }
+
+/* Hover-revealed copy affordances */
+.copy-host { position: relative; }
+.copy-host .copy-reveal {
+  position: absolute; top: 6px; right: 8px; display: inline-flex; opacity: 0;
+  transition: opacity 90ms ease-out; background: var(--bg1);
+  border: 1px solid var(--stroke2); border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,.08);
+}
+.copy-host:hover .copy-reveal, .copy-host:focus-within .copy-reveal { opacity: 1; }
+.copyable { cursor: pointer; border-radius: 3px; padding: 0 3px; margin: 0 -3px; transition: background-color 90ms ease-out; }
+.copyable:hover { background: rgba(0,0,0,.06); }
+.copied-toast {
+  position: absolute; top: 46px; right: 14px; z-index: 10;
+  padding: 3px 10px; border-radius: 5px; background: var(--bg1); color: var(--fg1);
+  border: 1px solid var(--stroke2); font-size: 11px; font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  opacity: 0; transform: translateY(-4px);
+  transition: opacity 130ms ease-out, transform 130ms ease-out; pointer-events: none;
+}
+.copied-toast.is-visible { opacity: 1; transform: translateY(0); }
+.x-findhit { background: rgba(255,196,0,.24); border-radius: 2px; }
+.x-findhit.active { background: rgba(255,196,0,.55); }
+
+/* ── Bottom dock ─────────────────────────────────────────────────────────── */
+.x-dock { flex-shrink: 0; min-width: 0; background: var(--bg2); }
+.x-docrow { display: flex; align-items: flex-start; min-width: 0; height: 29px; }
+.x-docrail { display: flex; align-items: flex-start; flex: 1; min-width: 0; height: 29px; }
+.x-detailspacer { flex-shrink: 0; height: 29px; border-left: 1px solid var(--stroke2); }
+.x-hscrollslot {
+  display: flex; align-items: center; flex: 0 1 38%;
+  min-width: clamp(140px, 24vw, 220px); max-width: 520px; height: 29px;
+  padding: 0 8px 0 6px; border-left: 1px solid var(--stroke3);
+}
+/* Custom horizontal scrollbar. A real thumb element rather than
+   ::-webkit-scrollbar styling, so it renders identically in Firefox. */
+.x-hbar {
+  position: relative; width: 100%; height: 6px;
+  border-radius: var(--r-circ); background: var(--bg3); cursor: pointer;
+}
+.x-hbar:focus-visible { outline: 2px solid var(--brandStroke1); outline-offset: 2px; }
+.x-hbar-thumb {
+  position: absolute; top: 0; height: 6px; min-width: 24px;
+  border-radius: var(--r-circ); background: var(--stroke1);
+}
+.x-hbar:hover .x-hbar-thumb, .x-hbar-thumb.dragging { background: var(--fg4); }
+
+/* Tab strip */
+.x-tabstrip { position: relative; display: flex; align-items: flex-start; flex: 1 1 auto; min-width: 0; height: 29px; padding: 0 8px; }
+.x-tabviewport { flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.x-tabviewport::-webkit-scrollbar { display: none; }
+.x-tablist { display: flex; align-items: center; gap: 0; width: max-content; min-width: 100%; height: 28px; }
+.x-tabshell {
+  position: relative; display: flex; align-items: center; flex: 0 1 auto;
+  width: max-content; min-width: 80px; max-width: 180px; height: 28px;
+  border: none; color: var(--fg2);
+}
+.x-tabshell:hover { background: var(--bg1Hover); color: var(--fg1); }
+.x-tabshell.active { color: var(--fg1); }
+.x-tabshell.active::after {
+  content: ""; position: absolute; left: 10px; right: 10px; bottom: 0; height: 2px;
+  border-radius: var(--r-circ); background: var(--brandStroke1);
+}
+.x-tabbtn {
+  display: flex; align-items: center; gap: 6px; min-width: 0; width: 100%; height: 100%;
+  padding: 0 12px; border: none; border-radius: inherit; background: transparent;
+  color: inherit; cursor: default; text-align: left; font-family: var(--font); font-size: 12px;
+}
+.x-tabicon { display: inline-flex; flex-shrink: 0; }
+.x-tabicon.live { color: var(--greenBg3); }
+.x-tabicon.err { color: var(--red); font-weight: 700; }
+.x-tabtitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.x-tabcount { color: var(--fg3); font-size: 10px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.x-renamewrap { display: flex; align-items: center; width: 100%; height: 100%; padding: 0 6px; }
+.x-renameinput {
+  width: 100%; min-width: 0; height: 22px; padding: 1px 5px;
+  border: 1px solid var(--brandStroke1); border-radius: var(--r-sm); outline: none;
+  font-family: var(--font); font-size: 12px;
+}
+.x-tabadd { flex-shrink: 0; min-width: 26px; width: 26px; height: 26px; margin-top: 1px; padding: 0; }
+
+/* Status bar */
+.x-status {
+  display: flex; align-items: center; justify-content: space-between; min-width: 0;
+  height: 22px; padding: 2px 10px; border-top: 1px solid var(--stroke3);
+  background: var(--bg2); color: var(--fg3); font-family: var(--mono); font-size: 11px;
+}
+.x-statusleft { display: flex; align-items: center; flex: 1; min-width: 0; gap: 10px; overflow: hidden; }
+.x-statusright { display: flex; align-items: center; flex-shrink: 0; gap: 10px; padding-left: 10px; }
+.x-statuspill { flex-shrink: 0; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; font-weight: 600; display: inline-flex; align-items: center; }
+.x-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.x-dot.running { background: #107c10; }
+.x-dot.idle { background: #a0a0a0; }
+.x-dot.error { background: #b00020; }
+.x-dot.transitioning { background: #f7b500; }
+.x-secondary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.x-statuserror { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #b00020; }
+.x-statusbtn {
+  flex-shrink: 0; border: none; background: transparent; padding: 1px 5px;
+  border-radius: var(--r-sm); color: var(--fg2); cursor: pointer; font-family: inherit; font-size: inherit;
+}
+.x-statusbtn:hover { color: var(--fg1); background: var(--bg1Hover); }
+.x-warnbadge {
+  display: inline-flex; align-items: center; height: 16px; padding: 0 6px;
+  border-radius: var(--r-circ); background: var(--marigold); color: #000;
+  font-size: 10px; font-weight: 600; font-family: var(--font);
+}
+
+/* ── Overlay: popovers, menus, tooltips ──────────────────────────────────── */
+#overlay { position: fixed; inset: 0; pointer-events: none; z-index: 100; }
+#overlay > * { pointer-events: auto; }
+.x-scrim { position: fixed; inset: 0; pointer-events: auto; }
+.x-popover {
+  position: fixed; background: var(--bg1); border: 1px solid var(--stroke2);
+  border-radius: var(--r-lg); box-shadow: var(--shadow16); padding: 12px;
+  max-height: 85vh; overflow-y: auto; overflow-x: hidden;
+}
+.x-menu {
+  position: fixed; background: var(--bg1); border: 1px solid var(--stroke2);
+  border-radius: var(--r-md); box-shadow: var(--shadow16); padding: 4px; min-width: 180px;
+  max-height: 70vh; overflow-y: auto;
+}
+.x-menuitem {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 6px 10px; border: none; background: transparent; border-radius: var(--r-md);
+  font-size: 14px; color: var(--fg1); cursor: pointer; text-align: left; font-family: var(--font);
+}
+.x-menuitem:hover { background: var(--bg1Hover); }
+.x-menuitem[disabled] { color: var(--fgDisabled); cursor: default; background: transparent; }
+.x-menuitem .tick { width: 16px; flex-shrink: 0; display: inline-flex; color: var(--fg1); }
+.x-menudivider { height: 1px; background: var(--stroke2); margin: 4px 6px; }
+.x-tooltip {
+  position: fixed; background: var(--bg1); color: var(--fg1);
+  border: 1px solid var(--stroke2); border-radius: var(--r-md);
+  box-shadow: var(--shadow4); padding: 6px 10px; font-size: 12px; line-height: 1.4;
+  max-width: 320px; z-index: 200; pointer-events: none;
+}
+.x-tooltip b { font-weight: 600; }
+
+/* ── Capture config panel ────────────────────────────────────────────────── */
+.x-cfg { display: flex; flex-direction: column; gap: 10px; min-width: 360px; max-width: 440px; }
+.x-cfghdr { display: flex; align-items: center; gap: 5px; min-height: 20px; }
+.x-cfglabel { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--fg3); font-weight: 600; }
+.x-info { display: inline-flex; align-items: center; color: var(--fg3); cursor: help; }
+.x-info:hover { color: var(--fg2); }
+.x-hint { font-size: 11px; color: var(--fg3); line-height: 1.4; }
+.x-err { font-size: 11px; color: var(--red); line-height: 1.4; }
+.x-list { display: flex; flex-direction: column; gap: 6px; }
+.x-listrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.x-listtext { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.x-listname { font-family: var(--mono); font-size: 11.5px; font-weight: 600; color: var(--fg1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.x-listsub { font-size: 10px; color: var(--fg3); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.x-listctl { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.x-rulelist { display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow-y: auto; }
+.x-rulerow { display: flex; align-items: center; gap: 6px; }
+.x-rulevalue { font-family: var(--mono); font-size: 11px; color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.x-addrow { display: flex; gap: 6px; align-items: center; }
+.x-addarea { display: flex; flex-direction: column; gap: 6px; }
+.x-kindtoggle { display: inline-flex; border: 1px solid var(--stroke1); border-radius: var(--r-md); overflow: hidden; flex-shrink: 0; }
+.x-kindbtn {
+  border: none; background: transparent; padding: 0 8px; height: 24px;
+  font-size: 11px; cursor: pointer; text-align: center; color: var(--fg2);
+}
+.x-kindbtn:hover { background: var(--bg1Hover); }
+.x-kindbtn.active { background: var(--brandBg2); color: var(--brandFg1); font-weight: 600; }
+.x-kindbtn.active:hover { background: var(--brandBg2); }
+.x-kindbtn.keep { background: var(--bg3); color: var(--fg3); }
+.x-kindbtn.keep:hover { background: var(--bg3); }
+.x-legseg { width: 58px; box-sizing: border-box; flex-shrink: 0; }
+/* Label sized to its BOLD width so selecting an option can never resize the button. */
+.x-reserve { display: inline-grid; justify-items: center; }
+.x-reserve > span { grid-area: 1 / 1; }
+.x-reserve > .ghost { font-weight: 600; visibility: hidden; }
+.x-sublabel { font-size: 11px; color: var(--fg2); width: 56px; flex-shrink: 0; }
+.x-chaoseditor, .x-chaosgroup { display: flex; flex-direction: column; gap: 6px; }
+.x-chaosfield { display: flex; align-items: center; gap: 6px; }
+.x-fullwidth { width: 100%; }
+.x-urlreveal { overflow: hidden; max-height: 0; opacity: 0; transition: max-height 160ms ease, opacity 120ms ease; }
+.x-urlreveal.open { max-height: 48px; opacity: 1; padding-top: 6px; }
+.x-leghead { display: flex; align-items: center; gap: 6px; }
+.x-leglabel { width: 71px; flex-shrink: 0; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--fg3); font-weight: 600; cursor: help; }
+.x-legchildren { display: flex; flex-direction: column; gap: 6px; border-left: 1px solid var(--stroke2); padding-left: 12px; margin-left: 2px; }
+.x-numchip { width: 64px; }
+.x-rightcol { width: 67px; min-width: 67px; flex-shrink: 0; }
+.x-suffix { font-size: 11px; color: var(--fg3); }
+.x-commitfoot { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.x-previewmuted { color: var(--fg3); }
+.x-testok { font-size: 11px; color: var(--green); font-family: var(--mono); }
+.x-testno { font-size: 11px; color: var(--fg3); }
+.x-cfgfooter { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.x-path { font-family: var(--mono); font-size: 10px; color: var(--fg4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.x-methods { position: relative; flex: 1; min-width: 0; }
+
+/* MCP panel */
+.x-mcp { display: flex; flex-direction: column; gap: 10px; min-width: 380px; max-width: 460px; }
+.x-mcptitle { font-size: 13px; font-weight: 600; color: var(--fg1); }
+.x-urlrow { display: flex; align-items: center; gap: 6px; background: var(--bg3); border-radius: var(--r-md); padding: 4px 4px 4px 8px; }
+.x-url { font-family: var(--mono); font-size: 11.5px; color: var(--fg1); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.x-cmdrow { display: flex; align-items: center; gap: 6px; }
+.x-cmdlabel { font-size: 11px; color: var(--fg2); width: 78px; flex-shrink: 0; }
+.x-cmd {
+  font-family: var(--mono); font-size: 10.5px; color: var(--fg2); flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  background: var(--bg3); border-radius: var(--r-sm); padding: 2px 6px;
+}
+.x-tools { font-family: var(--mono); font-size: 10px; color: var(--fg3); line-height: 1.4; word-break: break-word; }
+
+/* Mute panel */
+.x-mute { display: flex; flex-direction: column; gap: 8px; min-width: 300px; max-width: 380px; }
+.x-mutetitle { font-size: 12px; font-weight: 600; }
+.x-muteempty { font-size: 11.5px; color: var(--fg3); line-height: 1.4; }
+.x-mutelist { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto; }
+.x-muterow2 { display: flex; align-items: center; gap: 6px; }
+.x-mutekind { font-size: 10px; text-transform: uppercase; letter-spacing: .3px; color: var(--fg3); font-weight: 600; flex-shrink: 0; width: 38px; }
+.x-muteval { font-family: var(--mono); font-size: 11px; color: var(--fg1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.x-muteactions { display: flex; justify-content: space-between; gap: 6px; }
+
+/* ── Demo ribbon ─────────────────────────────────────────────────────────── */
+.x-demoribbon {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  padding: 5px 12px; background: #fff8e6; border-bottom: 1px solid #f0d998;
+  font-size: 11.5px; color: #6b4b00;
+}
+.x-demoribbon b { font-weight: 600; }
+.x-demoribbon .spacer { flex: 1; }
+.x-demoribbon button {
+  border: 1px solid #e0c684; background: transparent; color: #6b4b00;
+  border-radius: var(--r-md); font-size: 11px; padding: 2px 8px; cursor: pointer;
+}
+.x-demoribbon button:hover { background: #fdf0d0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .row-entering { animation: none; }
+  .x-urlreveal { transition-duration: .01ms; }
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="overlay"></div>
+<script>
+"use strict";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Inspector — static UI demo
+
+   Client-only reproduction of the Inspector desktop app. There is no proxy,
+   no capture, and no real telemetry: "Start" runs a generator that emits
+   synthetic rows on a timer. Every hostname, URL, class name, ULS tag and
+   message below is fictional.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tiny DOM helpers ────────────────────────────────────────────────────── */
+
+/** el("div.foo#bar", {attrs}, ...children) → HTMLElement */
+function el(spec, props, ...children) {
+  const m = /^([a-zA-Z0-9-]*)((?:[.#][^.#]+)*)$/.exec(spec) || [];
+  const tag = m[1] || "div";
+  const node = document.createElement(tag);
+  const rest = m[2] || "";
+  const classes = [];
+  let id = "";
+  rest.replace(/([.#])([^.#]+)/g, (_, sig, val) => {
+    if (sig === ".") classes.push(val);
+    else id = val;
+    return "";
+  });
+  if (classes.length) node.className = classes.join(" ");
+  if (id) node.id = id;
+  if (props) {
+    for (const k of Object.keys(props)) {
+      const v = props[k];
+      if (v === null || v === undefined || v === false) continue;
+      if (k === "class") node.className = (node.className ? node.className + " " : "") + v;
+      else if (k === "style" && typeof v === "object") Object.assign(node.style, v);
+      else if (k === "html") node.innerHTML = v;
+      else if (k === "text") node.textContent = v;
+      else if (k.startsWith("on") && typeof v === "function") node.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === "dataset") Object.assign(node.dataset, v);
+      else if (v === true) node.setAttribute(k, "");
+      else node.setAttribute(k, String(v));
+    }
+  }
+  add(node, children);
+  return node;
+}
+function add(parent, kids) {
+  for (const c of kids) {
+    if (c === null || c === undefined || c === false || c === true) continue;
+    if (Array.isArray(c)) add(parent, c);
+    else if (typeof c === "string" || typeof c === "number") parent.appendChild(document.createTextNode(String(c)));
+    else parent.appendChild(c);
+  }
+}
+function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+
+/* ── Icons (inline SVG, currentColor) ────────────────────────────────────── */
+const F = (vb, body, size) =>
+  `<svg viewBox="0 0 ${vb} ${vb}" width="${size || 20}" height="${size || 20}" fill="currentColor" aria-hidden="true">${body}</svg>`;
+const S = (vb, body, size, w) =>
+  `<svg viewBox="0 0 ${vb} ${vb}" width="${size || 20}" height="${size || 20}" fill="none" stroke="currentColor" stroke-width="${w || 1.7}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+
+const ICON = {
+  logo: S(28, '<rect x="2.5" y="4.5" width="23" height="16" rx="2.5"/><path d="M6.8 12.5h2.7l2-4.2 3 8.4 2-4.2h4.7"/><path d="M10 24.5h8"/>', 26, 2),
+  play: F(24, '<path d="M7.4 4.6a1 1 0 011-.03l11 6.6a1 1 0 010 1.72l-11 6.6A1 1 0 017 18.6V5.46a1 1 0 01.4-.86z"/>', 20),
+  stop: F(24, '<rect x="6" y="6" width="12" height="12" rx="1.6"/>', 20),
+  trash: F(24, '<path d="M10 3a2 2 0 00-2 2v1H5a1 1 0 100 2h.9l.9 10.2A3 3 0 009.8 21h4.4a3 3 0 003-2.8L18.1 8H19a1 1 0 100-2h-3V5a2 2 0 00-2-2h-4zm0 3V5h4v1h-4zm.5 4a.8.8 0 01.8.8v6a.8.8 0 11-1.6 0v-6a.8.8 0 01.8-.8zm3 0a.8.8 0 01.8.8v6a.8.8 0 11-1.6 0v-6a.8.8 0 01.8-.8z"/>', 20),
+  download: F(24, '<path d="M12 3a1 1 0 011 1v9.6l2.3-2.3a1 1 0 111.4 1.4l-4 4a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4l2.3 2.3V4a1 1 0 011-1zM4.5 17a1 1 0 011 1v1.2c0 .2.1.3.3.3h12.4c.2 0 .3-.1.3-.3V18a1 1 0 112 0v1.2a2.3 2.3 0 01-2.3 2.3H5.8a2.3 2.3 0 01-2.3-2.3V18a1 1 0 011-1z"/>', 20),
+  folder: F(24, '<path d="M3 7.2A3.2 3.2 0 016.2 4h2.5c.8 0 1.6.3 2.2.9l1.2 1.1h5.7A3.2 3.2 0 0121 9.2v7.6a3.2 3.2 0 01-3.2 3.2H6.2A3.2 3.2 0 013 16.8V7.2z"/>', 20),
+  filter: F(20, '<path d="M3 5.2c0-.7.6-1.2 1.2-1.2h11.6c.7 0 1.2.5 1.2 1.2 0 .3-.1.6-.3.8l-4.2 4.9v4a1.2 1.2 0 01-.7 1.1l-2.2 1a1.2 1.2 0 01-1.7-1.1v-5L3.3 6c-.2-.2-.3-.5-.3-.8z"/>', 20),
+  search: F(20, '<path d="M8.5 3a5.5 5.5 0 014.35 8.87l3.64 3.63a1 1 0 01-1.42 1.42l-3.63-3.64A5.5 5.5 0 118.5 3zm0 2a3.5 3.5 0 100 7 3.5 3.5 0 000-7z"/>', 20),
+  columns: F(24, '<path d="M5 3.5h14A2.5 2.5 0 0121.5 6v2H2.5V6A2.5 2.5 0 015 3.5zM2.5 9.8h6v10.7H5A2.5 2.5 0 012.5 18V9.8zm7.3 0h4.4v10.7H9.8V9.8zm5.7 0h6V18a2.5 2.5 0 01-2.5 2.5h-3.5V9.8z"/>', 20),
+  span: F(24, '<path d="M4.6 3.6a1 1 0 011 1v2.9l3.5-3.5a1 1 0 111.4 1.4L7 8.9h2.9a1 1 0 110 2H4.6a1 1 0 01-1-1V4.6a1 1 0 011-1zm14.8 16.8a1 1 0 01-1-1v-2.9l-3.5 3.5a1 1 0 01-1.4-1.4l3.5-3.5h-2.9a1 1 0 110-2h5.3a1 1 0 011 1v5.3a1 1 0 01-1 1z"/>', 20),
+  more: F(24, '<circle cx="5.5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="18.5" cy="12" r="1.9"/>', 20),
+  chevUp: F(20, '<path d="M4.3 12.3a1 1 0 001.4 0L10 8l4.3 4.3a1 1 0 001.4-1.42l-5-5a1 1 0 00-1.4 0l-5 5a1 1 0 000 1.42z"/>', 16),
+  chevDown: F(20, '<path d="M15.7 7.7a1 1 0 00-1.4 0L10 12 5.7 7.7a1 1 0 00-1.4 1.42l5 5a1 1 0 001.4 0l5-5a1 1 0 000-1.42z"/>', 16),
+  chevRight: F(20, '<path d="M7.7 4.3a1 1 0 000 1.4L12 10l-4.3 4.3a1 1 0 001.42 1.4l5-5a1 1 0 000-1.4l-5-5a1 1 0 00-1.42 0z"/>', 14),
+  gear: S(24, '<circle cx="12" cy="12" r="3.1"/><path d="M19.2 14.9a1.5 1.5 0 00.3 1.7l.05.05a1.9 1.9 0 11-2.7 2.7l-.05-.05a1.5 1.5 0 00-1.7-.3 1.5 1.5 0 00-.9 1.4v.15a1.9 1.9 0 11-3.8 0v-.08a1.5 1.5 0 00-1-1.37 1.5 1.5 0 00-1.7.3l-.05.05a1.9 1.9 0 11-2.7-2.7l.05-.05a1.5 1.5 0 00.3-1.7 1.5 1.5 0 00-1.37-.9H3.7a1.9 1.9 0 110-3.8h.08a1.5 1.5 0 001.37-1 1.5 1.5 0 00-.3-1.7l-.05-.05a1.9 1.9 0 112.7-2.7l.05.05a1.5 1.5 0 001.7.3h.07a1.5 1.5 0 00.9-1.37V3.7a1.9 1.9 0 113.8 0v.08a1.5 1.5 0 00.9 1.37 1.5 1.5 0 001.7-.3l.05-.05a1.9 1.9 0 112.7 2.7l-.05.05a1.5 1.5 0 00-.3 1.7v.07a1.5 1.5 0 001.37.9h.15a1.9 1.9 0 110 3.8h-.08a1.5 1.5 0 00-1.37.9z"/>', 20, 1.6),
+  plug: S(24, '<path d="M9 2.5v5.5M15 2.5v5.5M5.8 8h12.4v2.9a6.2 6.2 0 11-12.4 0V8zM12 17.1v4.4"/>', 20, 1.8),
+  eyeOff: S(20, '<path d="M2.8 2.8l14.4 14.4"/><path d="M8.3 8.4a2.4 2.4 0 003.3 3.4"/><path d="M6 6.2C4.2 7.2 2.8 8.9 2 10c1.3 2.1 4.3 5 8 5 1.2 0 2.4-.3 3.4-.9M15.9 12.7c1-.8 1.7-1.9 2.1-2.7-1.3-2.1-4.3-5-8-5-.6 0-1.1.1-1.7.2"/>', 20, 1.5),
+  dismiss: F(20, '<path d="M4.3 4.3a1 1 0 011.4 0L10 8.6l4.3-4.3a1 1 0 111.4 1.4L11.4 10l4.3 4.3a1 1 0 01-1.4 1.4L10 11.4l-4.3 4.3a1 1 0 01-1.4-1.4L8.6 10 4.3 5.7a1 1 0 010-1.4z"/>', 16),
+  addSm: F(20, '<path d="M10 3.2a1 1 0 011 1V9h4.8a1 1 0 110 2H11v4.8a1 1 0 11-2 0V11H4.2a1 1 0 110-2H9V4.2a1 1 0 011-1z"/>', 16),
+  info: F(16, '<path d="M8 1.4a6.6 6.6 0 110 13.2A6.6 6.6 0 018 1.4zm0 5.3a.65.65 0 00-.65.65v4a.65.65 0 101.3 0v-4A.65.65 0 008 6.7zm0-2.5a.85.85 0 100 1.7.85.85 0 000-1.7z"/>', 16),
+  copy: S(16, '<rect x="5.6" y="5.6" width="8.1" height="8.9" rx="1.5"/><path d="M10.4 3.6v-.3c0-1-.8-1.8-1.8-1.8H4.1c-1 0-1.8.8-1.8 1.8v5.1c0 .7.4 1.3 1 1.6"/>', 16, 1.25),
+  check: F(16, '<path d="M13.5 4.4a.8.8 0 011.2 1.05l-7.2 8a.8.8 0 01-1.15.05L2.9 10.1a.8.8 0 011.1-1.15l2.85 2.7 6.65-7.25z"/>', 16),
+  doc: S(16, '<path d="M3.6 2.7c0-.65.5-1.2 1.15-1.2h3.9l3.75 3.75v7.05c0 .65-.5 1.2-1.15 1.2H4.75c-.65 0-1.15-.55-1.15-1.2V2.7z"/><path d="M8.4 1.5v3.9h3.9"/>', 15, 1.2),
+  record: F(16, '<circle cx="8" cy="8" r="4.4"/>', 14),
+};
+
+/* ── Formatters (ported from src/renderer/src/utils/formatters.ts) ───────── */
+function formatTime(ts) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  return d.toLocaleTimeString("en-US", { hour12: false }) + "." + String(d.getMilliseconds()).padStart(3, "0");
+}
+function formatDateTime(ts) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  return d.toLocaleDateString("en-CA") + " " + d.toLocaleTimeString("en-US", { hour12: false }) + "." +
+    String(d.getMilliseconds()).padStart(3, "0");
+}
+function truncateStr(s, max) { if (!s) return ""; return s.length <= max ? s : s.slice(0, max) + "…"; }
+function shortSessionId(s) {
+  if (!s) return "";
+  if (s.startsWith("snapRequestID_")) return "snap:" + s.slice(14, 22);
+  return s.slice(0, 8);
+}
+function prettyJson(v) { try { return JSON.stringify(v, null, 2); } catch { return String(v); } }
+function prettyJsonText(t) { try { return JSON.stringify(JSON.parse(t), null, 2); } catch { return t; } }
+function looksLikeJson(t) {
+  const s = (t || "").trim();
+  if (!s.length || (s[0] !== "{" && s[0] !== "[")) return false;
+  try { JSON.parse(s); return true; } catch { return false; }
+}
+function formatBytes(n) {
+  if (!Number.isFinite(n) || n < 0) return "—";
+  if (n < 1024) return n + " B";
+  if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+  return (n / 1048576).toFixed(1) + " MB";
+}
+function escapeRegex(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+/* ── Level + status pill palettes ────────────────────────────────────────── */
+const LEVEL_STYLES = {
+  Error:     { background: "#fde7e9", text: "#b00020", border: "#f6a5b2", label: "ERR" },
+  Warning:   { background: "#fff4ce", text: "#8a5a00", border: "#f7d774", label: "WARN" },
+  Important: { background: "#e6f1ff", text: "#0050a4", border: "#a7c8f5", label: "IMP" },
+  Info:      { background: "#f3f2f1", text: "#605e5c", border: "#e1dfdd", label: "INFO" },
+  Verbose:   { background: "#f5f5f5", text: "#797775", border: "#e8e8e8", label: "VERB" },
+  Spam:      { background: "#fafafa", text: "#a19f9d", border: "#ededed", label: "SPAM" },
+};
+const LEVEL_CODE = { Error: 1, Warning: 2, Important: 3, Info: 4, Verbose: 5, Spam: 6 };
+function levelStyle(l) { return LEVEL_STYLES[l] || LEVEL_STYLES.Info; }
+
+const ST_GREEN  = { background: "#dff6dd", text: "#0b6a0b", border: "#a7d8a7" };
+const ST_CYAN   = { background: "#d8f0f5", text: "#00606e", border: "#a3d6e0" };
+const ST_ORANGE = { background: "#fde9d9", text: "#8a4b00", border: "#f3c79b" };
+const ST_RED    = { background: "#fde7e9", text: "#b00020", border: "#f6a5b2" };
+const ST_GREY   = { background: "#f3f2f1", text: "#605e5c", border: "#e1dfdd" };
+function statusStyle(s) {
+  if (s >= 200 && s < 300) return ST_GREEN;
+  if (s >= 300 && s < 400) return ST_CYAN;
+  if (s >= 400 && s < 500) return ST_ORANGE;
+  if (s >= 500 && s < 600) return ST_RED;
+  return ST_GREY;
+}
+function statusLabel(s) { return s > 0 ? String(s) : "—"; }
+
+function pill(style, label) {
+  return el("span.x-pill", {
+    style: { backgroundColor: style.background, color: style.text, borderColor: style.border },
+  }, label);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FICTIONAL DATA MODEL
+
+   All hosts, classes, tags, sources and messages below are invented for this
+   demo. They mirror the *shape* of real telemetry, not its content.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+const LOG_ENDPOINT = "https://liveapp.contoso.com/telemetry/RemoteLogs.ashx";
+
+/** The six built-in network classes the demo ships with. */
+const BUILTIN_CLASSES = ["Thumbnail", "Session", "Items", "Asset", "Media", "Embed"];
+
+const BUILTIN_CLASS_INFO = {
+  Thumbnail: "liveapp · /GetThumbnailUrl.ashx",
+  Session: "liveapp · /session.aspx",
+  Items: "liveapp · /items — slide data + thumbnails (multipart)",
+  Asset: "res-*.cdn.contoso.net · /live/… — JS / CSS / image (size only)",
+  Media: "video/audio — *-media.contoso.io/transform/…",
+  Embed: "Drive · /embed.aspx — embed host page",
+};
+
+/** Seeded hosts the demo proxy would decrypt. Fictional. */
+const BUILTIN_HOSTS = [
+  { id: "liveapp", label: "Live App", hostnames: ["liveapp.contoso.com", "*.liveapp.contoso.com"], enabled: true, builtin: true },
+  { id: "cdn", label: "Static CDN — assets", hostnames: ["res-*.cdn.contoso.net", "res.cdn.contoso.net"], enabled: true, builtin: true },
+  { id: "media", label: "Media — video / audio transcode", hostnames: ["*-media.contoso.io", "media.contoso.io"], enabled: true, builtin: true },
+  { id: "drive", label: "Drive / Storage", hostnames: ["*.contoso-drive.com", "*.contoso-drive-df.com"], enabled: true, builtin: true },
+];
+
+const HTTP_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "CONNECT", "TRACE"];
+const DEFAULT_FAULT_STATUS = 500;
+
+/** Fictional ULS tag registry: 5-char tag → category / level / source / message. */
+const LOG_RECIPES = [
+  { tag: "aq7kx", cat: 4821, catName: "ulscat_Bootstrap", level: "Important", src: "LiveBootstrapper",
+    msg: () => "LiveBootstrapper: host ready, build " + pick(["7.42.113", "7.42.118", "7.43.002"]) },
+  { tag: "bm2vp", cat: 4821, catName: "ulscat_Bootstrap", level: "Info", src: "LiveBootstrapper",
+    msg: () => 'Loaded module manifest {"modules":' + rnd(9, 22) + ',"cachedFromDisk":' + pick(["true", "false"]) + "}" },
+  { tag: "cn9ws", cat: 5107, catName: "ulscat_Session", level: "Important", src: "SessionClient",
+    msg: () => 'SessionClient: state update {"state":"connected","attempts":' + rnd(1, 3) + ',"transport":"websocket"}' },
+  { tag: "cn9ws", cat: 5107, catName: "ulscat_Session", level: "Warning", src: "SessionClient",
+    msg: () => "SessionClient: reconnect scheduled in " + rnd(2, 12) + "s after transport close (code 1006)" },
+  { tag: "dk4mt", cat: 5107, catName: "ulscat_Session", level: "Info", src: "SessionClient",
+    msg: () => "Heartbeat ack rtt=" + rnd(18, 140) + "ms seq=" + rnd(100, 999) },
+  { tag: "ep8jr", cat: 6210, catName: "ulscat_Render", level: "Info", src: "SlideRenderer",
+    msg: () => "SlideRenderer: frame " + rnd(1, 64) + " committed in " + rnd(8, 92) + "ms" },
+  { tag: "ep8jr", cat: 6210, catName: "ulscat_Render", level: "Verbose", src: "SlideRenderer",
+    msg: () => "Raster cache hit ratio " + (0.6 + Math.random() * 0.38).toFixed(2) + " over " + rnd(20, 120) + " tiles" },
+  { tag: "fr3ny", cat: 6210, catName: "ulscat_Render", level: "Warning", src: "SlideRenderer",
+    msg: () => "Long frame: " + rnd(220, 940) + "ms — layout thrash on slide " + rnd(2, 40) },
+  { tag: "gt6zb", cat: 6210, catName: "ulscat_Render", level: "Error", src: "SlideRenderer",
+    msg: () => 'Tile decode failed {"slide":' + rnd(2, 40) + ',"tile":' + rnd(0, 15) + ',"reason":"' + pick(["corrupt-header", "unsupported-codec", "truncated-stream"]) + '"}' },
+  { tag: "hy1qd", cat: 7304, catName: "ulscat_Nav", level: "Important", src: "NavController",
+    msg: () => 'Slide changed {"from":' + rnd(1, 30) + ',"to":' + rnd(1, 30) + ',"latencyMs":' + rnd(40, 480) + ',"source":"presenter"}' },
+  { tag: "hy1qd", cat: 7304, catName: "ulscat_Nav", level: "Info", src: "NavController",
+    msg: () => "Navigation queue drained, " + rnd(1, 4) + " pending → 0" },
+  { tag: "jv5cf", cat: 8115, catName: "ulscat_Media", level: "Info", src: "MediaPlayer",
+    msg: () => 'Playback started {"asset":"clip-' + rnd(1, 9) + '","durationMs":' + rnd(4000, 92000) + ',"bitrateKbps":' + rnd(480, 4200) + "}" },
+  { tag: "jv5cf", cat: 8115, catName: "ulscat_Media", level: "Warning", src: "MediaPlayer",
+    msg: () => "Rebuffer event " + rnd(1, 4) + " — stalled " + rnd(200, 2600) + "ms, dropping to next lower rendition" },
+  { tag: "kw2hl", cat: 8115, catName: "ulscat_Media", level: "Error", src: "MediaPlayer",
+    msg: () => 'Manifest fetch failed {"status":' + pick(["403", "404", "500", "504"]) + ',"retryIn":' + rnd(1, 8) + "}" },
+  { tag: "ln8ge", cat: 9022, catName: "ulscat_Network", level: "Info", src: "ItemsFetcher",
+    msg: () => "Fetched " + rnd(3, 40) + " items in " + rnd(60, 900) + "ms (multipart, " + rnd(2, 12) + " parts)" },
+  { tag: "ln8ge", cat: 9022, catName: "ulscat_Network", level: "Verbose", src: "ItemsFetcher",
+    msg: () => "Prefetch window advanced to slide " + rnd(2, 44) },
+  { tag: "mp4td", cat: 9022, catName: "ulscat_Network", level: "Warning", src: "ItemsFetcher",
+    msg: () => "Request retried (attempt " + rnd(2, 3) + ") after " + rnd(1, 6) + "s — transient network error" },
+  { tag: "nq7ba", cat: 9022, catName: "ulscat_Network", level: "Error", src: "ItemsFetcher",
+    msg: () => 'Items request rejected {"status":500,"correlationId":"' + guid() + '","endpoint":"/live/items"}' },
+  { tag: "ru3xk", cat: 4410, catName: "ulscat_Presence", level: "Info", src: "PresenceHub",
+    msg: () => "Roster update: " + rnd(2, 48) + " participants, " + rnd(0, 4) + " presenters" },
+  { tag: "ru3xk", cat: 4410, catName: "ulscat_Presence", level: "Verbose", src: "PresenceHub",
+    msg: () => "Presence ping " + rnd(1, 400) + " delivered to " + rnd(2, 48) + " peers" },
+  { tag: "sw9pm", cat: 4410, catName: "ulscat_Presence", level: "Spam",  src: "PresenceHub",
+    msg: () => "cursor@" + rnd(0, 1920) + "," + rnd(0, 1080) + " t=" + rnd(1000, 99999) },
+  { tag: "tz6uv", cat: 3308, catName: "ulscat_Snapshot", level: "Info", src: "SnapshotSvc",
+    msg: () => "Snapshot requested for slide " + rnd(1, 40) + " @ " + pick(["960x540", "1280x720", "1920x1080"]) },
+  { tag: "tz6uv", cat: 3308, catName: "ulscat_Snapshot", level: "Verbose", src: "SnapshotSvc",
+    msg: () => "Snapshot cache " + pick(["hit", "miss"]) + " for key " + hex(8) },
+  { tag: "ux2df", cat: 2201, catName: "ulscat_Telemetry", level: "Spam", src: "TelemetryPump",
+    msg: () => "Flushed " + rnd(1, 60) + " events (" + rnd(400, 18000) + " B) to collector" },
+  { tag: "vc5oh", cat: 2201, catName: "ulscat_Telemetry", level: "Verbose", src: "TelemetryPump",
+    msg: () => "Sampling rate now " + pick(["1:1", "1:5", "1:20"]) + " for category Render" },
+];
+
+/* ── Random helpers (seeded so a reload looks familiar but not identical) ── */
+let _seed = (Date.now() ^ 0x9e3779b9) >>> 0;
+function rand() {
+  _seed |= 0; _seed = (_seed + 0x6d2b79f5) | 0;
+  let t = Math.imul(_seed ^ (_seed >>> 15), 1 | _seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+function rnd(lo, hi) { return lo + Math.floor(rand() * (hi - lo + 1)); }
+function pick(arr) { return arr[Math.floor(rand() * arr.length)]; }
+function hex(n) { let s = ""; while (s.length < n) s += "0123456789abcdef"[Math.floor(rand() * 16)]; return s; }
+function guid() { return hex(8) + "-" + hex(4) + "-" + hex(4) + "-" + hex(4) + "-" + hex(12); }
+
+let _rowSeq = 0;
+function nextId(prefix) { return prefix + "-" + (++_rowSeq).toString(36) + "-" + hex(4); }
+
+/* ── Row factories ───────────────────────────────────────────────────────── */
+
+function makeLogRow(ctx, ts) {
+  const r = pick(LOG_RECIPES);
+  const message = r.msg();
+  let messageJson;
+  const brace = message.indexOf("{");
+  if (brace >= 0) { try { messageJson = JSON.parse(message.slice(brace)); } catch { /* leave undefined */ } }
+  const idDec = 0x40000000 + rnd(1, 0x3ffffff);
+  return {
+    kind: "log",
+    id: nextId("log"),
+    documentId: ctx.documentId, runId: ctx.runId, runNumber: ctx.runNumber,
+    sessionId: ctx.sessionId,
+    uploadId: ctx.uploadId,
+    capturedAt: ts, timestamp: ts,
+    eventIdHex: "0x" + idDec.toString(16), eventIdDec: idDec,
+    eventTag: rand() < 0.88 ? r.tag : undefined,
+    category: r.cat, categoryName: r.catName,
+    level: LEVEL_CODE[r.level], levelName: r.level, logType: 0,
+    message, messageJson,
+    source: r.src,
+    correlationId: rand() < 0.35 ? guid() : undefined,
+    endpoint: LOG_ENDPOINT,
+    endpointHost: "liveapp.contoso.com",
+    origin: ctx.origin || "live",
+  };
+}
+
+/** Per-class request recipes: how a network row of each class is shaped. */
+const NET_RECIPES = {
+  Thumbnail: () => {
+    const slide = rnd(1, 40);
+    return {
+      method: "GET", hostname: "liveapp.contoso.com",
+      pathname: "/live/GetThumbnailUrl.ashx",
+      query: "?usid=" + hex(16) + "&slide=" + slide + "&w=960",
+      status: rand() < 0.06 ? pick([404, 500]) : 200,
+      contentType: "application/json; charset=utf-8",
+      length: rnd(220, 900), dur: rnd(24, 340),
+      body: (n) => ({ kind: "json", text: JSON.stringify({ url: "https://res-2.cdn.contoso.net/live/thumb/" + hex(12) + ".png", width: 960, height: 540, expiresIn: 3600 }, null, 2) }),
+    };
+  },
+  Session: () => ({
+    method: "GET", hostname: "liveapp.contoso.com",
+    pathname: "/live/session.aspx",
+    query: "?usid=" + hex(16) + "&m=" + hex(8),
+    status: 200, contentType: "text/html; charset=utf-8",
+    length: rnd(18000, 62000), dur: rnd(120, 900),
+    body: () => ({ kind: "text", subtype: "html", text: "<!doctype html>\n<html>\n  <head>\n    <title>Contoso Live — session host</title>\n    <script src=\"https://res-1.cdn.contoso.net/live/boot.a83f21.js\"><\/script>\n  </head>\n  <body>\n    <div id=\"live-root\" data-session=\"" + hex(16) + "\"></div>\n  </body>\n</html>", truncated: { keptBytes: 220, totalBytes: 41200 } }),
+  }),
+  Items: () => ({
+    method: "POST", hostname: "liveapp.contoso.com",
+    pathname: "/live/items",
+    query: "?usid=" + hex(16),
+    status: rand() < 0.05 ? 500 : 200,
+    contentType: "multipart/mixed; boundary=--contoso-part",
+    length: rnd(40000, 380000), dur: rnd(180, 1400),
+    reqBody: () => ({ kind: "json", text: JSON.stringify({ slideIds: Array.from({ length: rnd(3, 8) }, () => hex(8)), fields: ["thumbnail", "notes", "layout"], revision: rnd(1, 40) }, null, 2) }),
+    body: () => ({
+      kind: "multipart", subtype: "mixed",
+      parts: [
+        { contentType: "application/json", sizeBytes: rnd(900, 4200), name: "manifest",
+          text: JSON.stringify({ items: rnd(3, 12), revision: rnd(1, 40), etag: hex(16) }, null, 2) },
+        { contentType: "image/png", sizeBytes: rnd(20000, 140000), name: "thumb-1", omittedReason: "binary" },
+        { contentType: "image/png", sizeBytes: rnd(20000, 140000), name: "thumb-2", omittedReason: "binary" },
+      ],
+    }),
+  }),
+  Asset: () => {
+    const f = pick([
+      { p: "/live/boot.a83f21.js", ct: "application/javascript" },
+      { p: "/live/vendor.51c0e9.js", ct: "application/javascript" },
+      { p: "/live/theme.7ba2.css", ct: "text/css" },
+      { p: "/live/icons/sprite.2f9c.svg", ct: "image/svg+xml" },
+      { p: "/live/fonts/inter-var.woff2", ct: "font/woff2" },
+    ]);
+    return {
+      method: "GET", hostname: "res-" + rnd(1, 3) + ".cdn.contoso.net",
+      pathname: f.p, query: "",
+      status: rand() < 0.12 ? 304 : 200,
+      contentType: f.ct, length: rnd(4000, 620000), dur: rnd(8, 220),
+      body: (n) => ({ kind: "omitted", reason: "asset", contentType: f.ct, sizeBytes: n }),
+    };
+  },
+  Media: () => ({
+    method: "GET", hostname: pick(["eu", "na", "ap"]) + "-media.contoso.io",
+    pathname: "/transform/videomanifest",
+    query: "?provider=live&format=dash&q=" + rnd(360, 1080) + "p&t=" + hex(10),
+    status: rand() < 0.08 ? pick([403, 504]) : 200,
+    contentType: "application/dash+xml", length: rnd(1800, 26000), dur: rnd(90, 1800),
+    body: () => ({ kind: "text", subtype: "xml", text: '<?xml version="1.0"?>\n<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" mediaPresentationDuration="PT' + rnd(10, 240) + 'S">\n  <Period>\n    <AdaptationSet mimeType="video/mp4">\n      <Representation id="1" bandwidth="' + rnd(400000, 4200000) + '" width="1280" height="720"/>\n    </AdaptationSet>\n  </Period>\n</MPD>' }),
+  }),
+  Embed: () => ({
+    method: "GET", hostname: "tenant.contoso-drive.com",
+    pathname: "/personal/embed.aspx",
+    query: "?e=" + hex(12) + "&nav=" + hex(6),
+    status: 200, contentType: "text/html; charset=utf-8",
+    length: rnd(9000, 48000), dur: rnd(140, 1100),
+    body: () => ({ kind: "text", subtype: "html", text: "<!doctype html>\n<html><body>\n  <iframe title=\"embed host\" src=\"https://liveapp.contoso.com/live/session.aspx?usid=" + hex(16) + "\"></iframe>\n</body></html>" }),
+  }),
+};
+
+function makeNetRow(ctx, ts, forcedClass) {
+  const netClass = forcedClass || pick(BUILTIN_CLASSES);
+  const recipe = (NET_RECIPES[netClass] || NET_RECIPES.Asset)();
+  const length = recipe.status === 304 ? 0 : recipe.length;
+  const row = {
+    kind: "network",
+    id: nextId("net"),
+    documentId: ctx.documentId, runId: ctx.runId, runNumber: ctx.runNumber,
+    timestamp: ts, capturedAt: ts,
+    sessionId: rand() < 0.85 ? ctx.sessionId : undefined,
+    origin: ctx.origin || "live",
+    netClass,
+    method: recipe.method,
+    url: "https://" + recipe.hostname + recipe.pathname + recipe.query,
+    hostname: recipe.hostname,
+    pathname: recipe.pathname,
+    status: recipe.status,
+    statusText: STATUS_TEXT[recipe.status] || "",
+    contentType: recipe.contentType,
+    contentLength: length,
+    durationMs: recipe.dur,
+    requestHeaders: {
+      ":method": recipe.method,
+      "accept": recipe.method === "POST" ? "application/json" : "*/*",
+      "accept-encoding": "gzip, deflate, br",
+      "origin": "https://liveapp.contoso.com",
+      "referer": "https://liveapp.contoso.com/live/session.aspx",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ContosoLive/7.42",
+      "x-request-id": guid(),
+    },
+    responseHeaders: {
+      "content-type": recipe.contentType,
+      "content-length": String(length),
+      "cache-control": recipe.status === 304 ? "public, max-age=31536000" : "no-store",
+      "x-served-by": "edge-" + pick(["ams", "sea", "iad", "sin"]) + "-" + rnd(10, 99),
+      "x-response-time": recipe.dur + "ms",
+    },
+    redactedRequestHeaders: ["authorization", "cookie"],
+    redactedResponseHeaders: ["set-cookie"],
+    requestBody: recipe.reqBody ? recipe.reqBody() : { kind: "empty" },
+    body: recipe.status === 304 ? { kind: "empty" } : recipe.body(length),
+  };
+  return row;
+}
+
+const STATUS_TEXT = {
+  200: "OK", 204: "No Content", 206: "Partial Content", 304: "Not Modified",
+  400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found",
+  429: "Too Many Requests", 500: "Internal Server Error", 502: "Bad Gateway",
+  503: "Service Unavailable", 504: "Gateway Timeout", 0: "Closed (chaos)",
+};
+
+/**
+ * Apply an armed fault rule to a freshly-made network row, preserving the real
+ * upstream response under `fault.original` exactly like the proxy does.
+ */
+function applyFaultToRow(row, rule) {
+  const original = {
+    status: row.status, statusText: row.statusText,
+    contentType: row.contentType, contentLength: row.contentLength,
+    responseHeaders: Object.assign({}, row.responseHeaders),
+    redactedResponseHeaders: row.redactedResponseHeaders.slice(),
+    body: row.body,
+  };
+  const notes = [];
+  const blocked = rule.request && rule.request.action === "block";
+  if (blocked) notes.push("request blocked");
+  else if (rule.request) {
+    if (rule.request.url) notes.push("redirected");
+    if (rule.request.body) notes.push("req body " + rule.request.body.mode);
+    if (rule.request.headers) notes.push("req headers " + rule.request.headers.mode);
+  }
+
+  if (rule.kind === "drop") {
+    row.status = 0;
+    row.statusText = "Closed (chaos)";
+    row.contentLength = 0;
+    row.body = { kind: "empty" };
+    row.responseHeaders = {};
+    notes.push("connection dropped");
+  } else {
+    if (rule.status != null) { notes.push("status " + original.status + " → " + rule.status); row.status = rule.status; row.statusText = STATUS_TEXT[rule.status] || ""; }
+    if (rule.body) {
+      if (rule.body.mode === "empty") { row.body = { kind: "empty" }; row.contentLength = 0; notes.push("body emptied"); }
+      else if (rule.body.mode === "truncate") {
+        const keep = Math.floor(row.contentLength / 2);
+        const t = bodyText(row.body);
+        if (t != null) {
+          row.body = {
+            kind: "text", subtype: "plain",
+            text: t.slice(0, Math.max(40, Math.floor(t.length / 2))),
+            truncated: { keptBytes: keep, totalBytes: row.contentLength },
+          };
+        } else if (row.body.kind === "multipart") {
+          // Truncating a multipart body cuts it mid-stream, so the client sees
+          // only the leading parts.
+          const keepParts = Math.max(1, Math.floor(row.body.parts.length / 2));
+          row.body = { kind: "multipart", subtype: row.body.subtype, parts: row.body.parts.slice(0, keepParts) };
+        } else {
+          row.body = { kind: "binary", contentType: row.contentType, sizeBytes: keep };
+        }
+        notes.push("body truncated " + formatBytes(original.contentLength) + " → " + formatBytes(keep));
+        row.contentLength = keep;
+      } else if (rule.body.mode === "replace") {
+        row.body = { kind: "text", subtype: "plain", text: rule.body.text || "" };
+        row.contentLength = (rule.body.text || "").length;
+        notes.push("body replaced");
+      }
+    }
+    if (rule.headers) {
+      if (rule.headers.mode === "empty") { row.responseHeaders = {}; notes.push("headers emptied"); }
+      else { row.responseHeaders = Object.assign({}, row.responseHeaders, rule.headers.entries || {}); notes.push("headers overridden"); }
+    }
+  }
+  if (rule.delaySec) { row.durationMs += rule.delaySec * 1000; notes.push("delayed " + rule.delaySec + "s"); }
+
+  row.fault = {
+    ruleId: rule.id,
+    note: notes.length ? notes.join("; ") : "faulted",
+    blocked: blocked || undefined,
+    sentUrl: rule.request && rule.request.url ? rule.request.url.url : undefined,
+    original: blocked ? undefined : original,
+  };
+  return row;
+}
+
+/** Extract renderable text from a body union, or null when there is none. */
+function bodyText(b) {
+  if (!b) return null;
+  if (b.kind === "json" || b.kind === "text") return b.text;
+  return null;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COLUMNS
+   ═════════════════════════════════════════════════════════════════════════ */
+
+function shortCategory(name, num) {
+  return name.startsWith("ulscat_") ? name.replace("ulscat_", "") + " (" + num + ")" : String(num);
+}
+function oneLine(s) { return s.replace(/\s+/g, " ").trim(); }
+function shortMethod(m) { return m === "OPTIONS" ? "OPT" : m; }
+function networkSummary(r) { return r.pathname + " (" + formatBytes(r.contentLength) + ", " + r.durationMs + "ms)"; }
+
+const COLUMN_DEFS = [
+  {
+    id: "time", label: "Time", defaultWidth: 96, minWidth: 70,
+    render: (r) => el("div.x-cell.x-timecell", null, formatTime(r.timestamp)),
+    sortValue: (r) => r.timestamp,
+  },
+  {
+    id: "level", label: "Level", defaultWidth: 60, minWidth: 50,
+    render: (r) => {
+      const st = r.kind === "log" ? levelStyle(r.levelName) : statusStyle(r.status);
+      const label = r.kind === "log" ? levelStyle(r.levelName).label : statusLabel(r.status);
+      return el("div.x-cell", null, pill(st, label));
+    },
+    sortValue: (r) => (r.kind === "log" ? r.level : r.status),
+  },
+  {
+    id: "tag", label: "Tag", defaultWidth: 110, minWidth: 70,
+    render: (r) => {
+      if (r.kind === "network") {
+        return el("div.x-cell.x-nettagcell", { title: r.fault ? "Faulted network request (chaos)" : "Network request" },
+          r.fault ? "⚡NET" : "NET");
+      }
+      const t = r.eventTag || r.eventIdHex;
+      return el("div.x-cell." + (r.eventTag ? "x-tagcell" : "x-hexcell"), { title: r.eventIdHex }, t);
+    },
+    sortValue: (r) => (r.kind === "log" ? r.eventTag || r.eventIdHex : "NET"),
+  },
+  {
+    id: "category", label: "Category", defaultWidth: 132, minWidth: 80,
+    render: (r) => r.kind === "network"
+      ? el("div.x-cell", { title: r.netClass + " request" }, r.netClass)
+      : el("div.x-cell", { title: r.categoryName }, shortCategory(r.categoryName, r.category)),
+    sortValue: (r) => (r.kind === "log" ? r.category : r.netClass),
+  },
+  {
+    id: "session", label: "Session", defaultWidth: 104, minWidth: 70,
+    render: (r) => el("div.x-cell.x-sessioncell", { title: r.sessionId || "" },
+      r.sessionId ? shortSessionId(r.sessionId) : "—"),
+    sortValue: (r) => r.sessionId || "",
+  },
+  {
+    id: "source", label: "Source", defaultWidth: 132, minWidth: 80,
+    render: (r) => r.kind === "network"
+      ? el("div.x-cell.x-sourcecell", { title: r.method }, shortMethod(r.method))
+      : el("div.x-cell.x-sourcecell", { title: r.source || "" }, r.source ? truncateStr(r.source, 18) : "—"),
+    sortValue: (r) => (r.kind === "log" ? r.source || "" : r.method),
+  },
+  {
+    id: "message", label: "Message", defaultWidth: 800, minWidth: 200,
+    render: (r) => {
+      if (r.kind === "network") {
+        const summary = networkSummary(r);
+        return el("div.x-cell.x-messagecell", { title: r.url }, r.fault ? summary + " · " + r.fault.note : summary);
+      }
+      return el("div.x-cell.x-messagecell", { title: r.message }, oneLine(r.message));
+    },
+    sortValue: (r) => (r.kind === "log" ? r.message : r.pathname),
+  },
+];
+const COLUMN_BY_ID = Object.fromEntries(COLUMN_DEFS.map((c) => [c.id, c]));
+
+const ROW_HEIGHT = 28;
+const OVERSCAN = 12;
+const DETAIL_MIN = 280, DETAIL_MAX = 1000, DETAIL_DEFAULT = 420;
+
+/** Noise rules the "Mute known noise" button installs. Fictional, like the tags. */
+const KNOWN_NOISE = [
+  { kind: "tag", value: "sw9pm" },
+  { kind: "regex", value: escapeRegex("Flushed") },
+];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATE
+   ═════════════════════════════════════════════════════════════════════════ */
+
+function defaultConfig() {
+  return {
+    captureUlsLogs: true,
+    builtinsEnabled: {},
+    classificationRules: [],
+    mitmHosts: BUILTIN_HOSTS.map((h) => Object.assign({}, h, { hostnames: h.hostnames.slice() })),
+    chaosEnabled: false,
+    faultRules: [],
+  };
+}
+
+function defaultWidths() {
+  const w = {};
+  for (const c of COLUMN_DEFS) w[c.id] = c.defaultWidth;
+  return w;
+}
+function defaultVisible() {
+  const v = {};
+  for (const c of COLUMN_DEFS) v[c.id] = true;
+  return v;
+}
+
+const state = {
+  documents: [],
+  activeDocumentId: "",
+  capture: { status: "idle", liveDocumentId: undefined, proxyPort: 0, droppedCount: 0, errorMessage: "" },
+  searchText: "",
+  searchMode: "find",
+  findActiveIndex: 0,
+  rowKindFilter: "both",
+  muteRules: [],
+  spanZoom: false,
+  sort: undefined,
+  columnWidths: defaultWidths(),
+  columnVisible: defaultVisible(),
+  selectedEventId: undefined,
+  followingTail: true,
+  detailWidth: DETAIL_DEFAULT,
+  config: defaultConfig(),
+  mcp: { enabled: false, url: "http://127.0.0.1:8791/mcp" },
+  overlay: null,
+  tabRename: undefined,
+  detailFind: { open: false, text: "", index: 0 },
+  sections: {},
+  ribbonDismissed: false,
+  drafts: {
+    muteDraft: "",
+    domain: "", domainRecord: true, domainError: "",
+    recordHost: "", recordLabel: "", recordKind: "url-substring", recordValue: "", recordError: "",
+    faultClass: "", faultUrl: "", showUrlContains: false, faultMethods: [],
+    faultProb: "100", faultDelay: "0",
+    reqAction: "block", reqUrlMode: "keep", reqUrl: "", reqHeaderMode: "keep", reqHeaders: "",
+    reqBodyMode: "keep", reqBody: "",
+    faultKind: "drop", statusMode: "keep", faultStatus: String(DEFAULT_FAULT_STATUS),
+    headerMode: "keep", faultHeaders: "", bodyMode: "keep", faultBody: "",
+    testUrl: "", testOutcome: undefined,
+  },
+};
+
+function activeDoc() { return state.documents.find((d) => d.id === state.activeDocumentId); }
+function docById(id) { return state.documents.find((d) => d.id === id); }
+function liveDoc() { return state.documents.find((d) => d.id === state.capture.liveDocumentId); }
+
+let _docSeq = 0;
+function nextCaptureTitle() {
+  const used = new Set(state.documents.filter((d) => d.autoTitle).map((d) => d.autoNumber));
+  let n = 1;
+  while (used.has(n)) n++;
+  return { title: "Capture " + n, number: n };
+}
+function createDocument(kind, title) {
+  const auto = kind === "capture" && !title ? nextCaptureTitle() : null;
+  const doc = {
+    id: "doc-" + (++_docSeq),
+    kind,
+    title: title || (auto ? auto.title : "Document"),
+    autoTitle: !!auto,
+    autoNumber: auto ? auto.number : 0,
+    status: "idle",
+    rows: [],
+    runs: [],
+    nextRun: 1,
+    sessionId: hex(24),
+    uploadId: rnd(1000, 9999),
+    scrollTop: 0,
+    markerSeq: 0,
+  };
+  state.documents.push(doc);
+  return doc;
+}
+
+/* ── Derived views ───────────────────────────────────────────────────────── */
+
+function compileMutes(rules) {
+  const tags = new Set(), regexes = [];
+  for (const r of rules) {
+    if (!r.value) continue;
+    if (r.kind === "tag") tags.add(r.value);
+    else { try { regexes.push(new RegExp(r.value, "i")); } catch { /* ignore bad regex */ } }
+  }
+  return { tags, regexes, any: tags.size > 0 || regexes.length > 0 };
+}
+
+function rowMatchesSearch(r, lower) {
+  if (!lower) return true;
+  if (r.kind === "network") {
+    return r.url.toLowerCase().includes(lower)
+      || r.pathname.toLowerCase().includes(lower)
+      || r.method.toLowerCase().includes(lower)
+      || String(r.status).includes(lower)
+      || r.netClass.toLowerCase().includes(lower)
+      || (r.contentType ? r.contentType.toLowerCase().includes(lower) : false)
+      || (r.sessionId ? r.sessionId.toLowerCase().includes(lower) : false)
+      || (r.fault ? r.fault.note.toLowerCase().includes(lower) : false)
+      || (r.fault && r.fault.sentUrl ? r.fault.sentUrl.toLowerCase().includes(lower) : false);
+  }
+  return r.message.toLowerCase().includes(lower)
+    || r.eventIdHex.toLowerCase().includes(lower)
+    || (r.eventTag ? r.eventTag.toLowerCase().includes(lower) : false)
+    || (r.source ? r.source.toLowerCase().includes(lower) : false)
+    || r.sessionId.toLowerCase().includes(lower);
+}
+
+function isDataRow(r) { return r.kind === "log" || r.kind === "network"; }
+
+/** Rows between the last two markers, inclusive of the opening marker. */
+function spanSlice(rows) {
+  const idx = [];
+  for (let i = rows.length - 1; i >= 0 && idx.length < 2; i--) if (rows[i].kind === "marker") idx.push(i);
+  if (idx.length < 2) return rows;
+  return rows.slice(idx[1], idx[0] + 1);
+}
+
+/** The visible timeline for the active document, after every view filter. */
+function visibleRows() {
+  const doc = activeDoc();
+  if (!doc) return [];
+  let rows = doc.rows;
+  if (state.spanZoom && !state.sort) rows = spanSlice(rows);
+
+  const lower = state.searchMode === "filter" ? state.searchText.toLowerCase() : "";
+  const mutes = compileMutes(state.muteRules);
+  if (lower || state.rowKindFilter !== "both" || mutes.any) {
+    rows = rows.filter((r) => {
+      if (r.kind === "marker" || r.kind === "run-boundary") return true;
+      if (state.rowKindFilter === "logs" && r.kind !== "log") return false;
+      if (state.rowKindFilter === "network" && r.kind !== "network") return false;
+      if (mutes.any && r.kind === "log") {
+        if (mutes.tags.size && (mutes.tags.has(r.eventIdHex) || (r.eventTag && mutes.tags.has(r.eventTag)))) return false;
+        if (mutes.regexes.some((re) => re.test(r.message))) return false;
+      }
+      return rowMatchesSearch(r, lower);
+    });
+  }
+
+  if (state.sort) {
+    const col = COLUMN_BY_ID[state.sort.columnId];
+    if (col) {
+      const dir = state.sort.direction === "asc" ? 1 : -1;
+      const out = [], run = [];
+      const flush = () => {
+        run.sort((a, b) => {
+          const va = col.sortValue(a), vb = col.sortValue(b);
+          return va < vb ? -dir : va > vb ? dir : 0;
+        });
+        out.push(...run); run.length = 0;
+      };
+      for (const r of rows) {
+        if (r.kind === "run-boundary") { flush(); out.push(r); }
+        else if (r.kind === "marker") { flush(); out.push(r); }
+        else run.push(r);
+      }
+      flush();
+      rows = out;
+    }
+  }
+  return rows;
+}
+
+/** Indexes of rows matching the Find query, in display order. */
+function findMatchIndexes(rows) {
+  if (state.searchMode !== "find" || !state.searchText) return [];
+  const lower = state.searchText.toLowerCase();
+  const out = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (isDataRow(r) && rowMatchesSearch(r, lower)) out.push(i);
+  }
+  return out;
+}
+
+function selectedRow() {
+  const doc = activeDoc();
+  if (!doc || !state.selectedEventId) return undefined;
+  return doc.rows.find((r) => r.id === state.selectedEventId);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CAPTURE ENGINE — synthetic row generation on a timer
+   ═════════════════════════════════════════════════════════════════════════ */
+
+let streamTimer = null;
+let transitionTimer = null;
+
+function armedFaultFor(netClass, url, method) {
+  if (!state.config.chaosEnabled) return undefined;
+  for (const f of state.config.faultRules) {
+    if (!f.enabled) continue;
+    if (f.targetClass !== netClass) continue;
+    if (f.urlContains && !url.toLowerCase().includes(f.urlContains.toLowerCase())) continue;
+    if (f.methods && f.methods.length && !f.methods.includes(method)) continue;
+    if (rand() > f.probability) continue;
+    return f;
+  }
+  return undefined;
+}
+
+/** Classes that are actually being recorded, per the capture config. */
+function recordedClasses() {
+  const out = BUILTIN_CLASSES.filter((c) => state.config.builtinsEnabled[c] !== false);
+  for (const r of state.config.classificationRules) {
+    if (r.enabled && r.label && !out.includes(r.label)) out.push(r.label);
+  }
+  return out;
+}
+
+function emitBatch() {
+  const doc = liveDoc();
+  if (!doc) return;
+  const run = doc.runs[doc.runs.length - 1];
+  const ctx = { documentId: doc.id, runId: run.id, runNumber: run.number, sessionId: doc.sessionId, uploadId: doc.uploadId, origin: "live" };
+  const n = rnd(1, 4);
+  const now = Date.now();
+  const fresh = [];
+  const classes = recordedClasses();
+  for (let i = 0; i < n; i++) {
+    const ts = now + i;
+    let row;
+    const wantNetwork = classes.length > 0 && rand() < 0.34;
+    if (!wantNetwork && !state.config.captureUlsLogs) {
+      if (!classes.length) continue;
+      row = makeNetRow(ctx, ts, pick(classes));
+    } else if (wantNetwork) {
+      row = makeNetRow(ctx, ts, pick(classes));
+    } else {
+      if (!state.config.captureUlsLogs) continue;
+      row = makeLogRow(ctx, ts);
+    }
+    if (row.kind === "network") {
+      const f = armedFaultFor(row.netClass, row.url, row.method);
+      if (f) applyFaultToRow(row, f);
+    }
+    fresh.push(row);
+  }
+  if (!fresh.length) return;
+  doc.rows.push(...fresh);
+  for (const r of fresh) freshIds.add(r.id);
+  setTimeout(() => { for (const r of fresh) freshIds.delete(r.id); }, 320);
+
+  // Occasional dropped-row pressure, to exercise the status-bar badge.
+  if (rand() < 0.012) state.capture.droppedCount += rnd(1, 6);
+
+  renderAll();
+}
+
+const freshIds = new Set();
+
+function scheduleStream() {
+  clearTimeout(streamTimer);
+  if (state.capture.status !== "running") return;
+  streamTimer = setTimeout(() => { emitBatch(); scheduleStream(); }, rnd(170, 430));
+}
+
+function startCapture(documentId) {
+  if (state.capture.status === "running" || state.capture.status === "starting") return;
+  let doc = documentId ? docById(documentId) : undefined;
+  if (!doc || doc.kind === "har") doc = createDocument("capture");
+  state.activeDocumentId = doc.id;
+  state.capture.status = "starting";
+  state.capture.errorMessage = "";
+  state.selectedEventId = undefined;
+  renderAll();
+
+  clearTimeout(transitionTimer);
+  transitionTimer = setTimeout(() => {
+    const run = { id: "run-" + doc.id + "-" + doc.nextRun, number: doc.nextRun++ };
+    doc.runs.push(run);
+    // Runs after the first get a divider so late rows stay attributable.
+    if (doc.runs.length > 1) {
+      doc.rows.push({
+        kind: "run-boundary", id: nextId("rb"), timestamp: Date.now(),
+        documentId: doc.id, runId: run.id, runNumber: run.number, truncated: false,
+      });
+    }
+    doc.status = "live";
+    state.capture.status = "running";
+    state.capture.liveDocumentId = doc.id;
+    state.capture.proxyPort = state.capture.proxyPort || rnd(49200, 49900);
+    state.followingTail = true;
+    renderAll();
+    scheduleStream();
+  }, 450);
+}
+
+function stopCapture() {
+  if (state.capture.status !== "running" && state.capture.status !== "starting") return;
+  clearTimeout(streamTimer);
+  clearTimeout(transitionTimer);
+  state.capture.status = "stopping";
+  renderAll();
+  transitionTimer = setTimeout(() => {
+    const doc = liveDoc();
+    if (doc) doc.status = "frozen";
+    state.capture.status = "idle";
+    state.capture.liveDocumentId = undefined;
+    renderAll();
+  }, 380);
+}
+
+/** Seed a document with a burst of rows without running the live stream. */
+function seedRows(doc, count, origin) {
+  if (!doc.runs.length) doc.runs.push({ id: "run-" + doc.id + "-1", number: doc.nextRun++ });
+  const run = doc.runs[doc.runs.length - 1];
+  const ctx = { documentId: doc.id, runId: run.id, runNumber: run.number, sessionId: doc.sessionId, uploadId: doc.uploadId, origin: origin || "live" };
+  const start = Date.now() - count * 90;
+  for (let i = 0; i < count; i++) {
+    const ts = start + i * 90 + rnd(0, 60);
+    doc.rows.push(rand() < 0.32 ? makeNetRow(ctx, ts) : makeLogRow(ctx, ts));
+  }
+  doc.rows.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+/* ── Markers ─────────────────────────────────────────────────────────────── */
+
+function addMarker(label) {
+  const doc = activeDoc();
+  if (!doc) return;
+  doc.rows.push({ kind: "marker", id: nextId("mk"), timestamp: Date.now(), label: label || "Marker " + (++doc.markerSeq), seq: doc.markerSeq });
+  renderAll();
+}
+function insertMarkerAtRow(rowId) {
+  const doc = activeDoc();
+  if (!doc) return;
+  const i = doc.rows.findIndex((r) => r.id === rowId);
+  if (i < 0) return;
+  doc.rows.splice(i, 0, { kind: "marker", id: nextId("mk"), timestamp: doc.rows[i].timestamp, label: "Marker " + (++doc.markerSeq), seq: doc.markerSeq });
+  renderAll();
+}
+function removeMarker(id) {
+  const doc = activeDoc();
+  if (!doc) return;
+  doc.rows = doc.rows.filter((r) => r.id !== id);
+  if (markerCount(doc) < 2) state.spanZoom = false;
+  renderAll();
+}
+function markerCount(doc) { return doc ? doc.rows.reduce((n, r) => n + (r.kind === "marker" ? 1 : 0), 0) : 0; }
+
+function jumpMarker(dir) {
+  const rows = visibleRows();
+  const markers = [];
+  for (let i = 0; i < rows.length; i++) if (rows[i].kind === "marker") markers.push(i);
+  if (!markers.length) return;
+  const cur = tableEls.scroller ? Math.round(tableEls.scroller.scrollTop / ROW_HEIGHT) : 0;
+  let target;
+  if (dir > 0) target = markers.find((i) => i > cur);
+  else { const before = markers.filter((i) => i < cur); target = before[before.length - 1]; }
+  if (target === undefined) target = dir > 0 ? markers[0] : markers[markers.length - 1];
+  state.followingTail = false;
+  scrollRowIntoView(target, true);
+  renderAll();
+}
+
+/* ── Mute rules ──────────────────────────────────────────────────────────── */
+function addMuteRule(rule) {
+  if (!rule.value) return;
+  if (state.muteRules.some((r) => r.kind === rule.kind && r.value === rule.value)) return;
+  state.muteRules = state.muteRules.concat([rule]);
+  renderAll();
+}
+function removeMuteRule(rule) {
+  state.muteRules = state.muteRules.filter((r) => !(r.kind === rule.kind && r.value === rule.value));
+  renderAll();
+}
+function clearViewFilters() {
+  state.rowKindFilter = "both";
+  state.searchText = "";
+  state.muteRules = [];
+  state.spanZoom = false;
+  renderAll();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RENDER LOOP
+   ═════════════════════════════════════════════════════════════════════════ */
+
+const appEl = document.getElementById("app");
+const overlayEl = document.getElementById("overlay");
+const tableEls = { root: null, headerScroll: null, header: null, scroller: null, spacer: null, docId: null };
+
+/** Record which field has focus so a full re-render doesn't steal the caret. */
+function captureFocus() {
+  const a = document.activeElement;
+  if (!a || !a.dataset || !a.dataset.k) return null;
+  const snap = { k: a.dataset.k };
+  if (a.selectionStart !== undefined && a.selectionStart !== null) {
+    snap.start = a.selectionStart; snap.end = a.selectionEnd;
+  }
+  return snap;
+}
+function restoreFocus(snap) {
+  if (!snap) return;
+  const node = document.querySelector('[data-k="' + snap.k + '"]');
+  if (!node) return;
+  node.focus();
+  if (snap.start !== undefined && node.setSelectionRange) {
+    try { node.setSelectionRange(snap.start, snap.end); } catch { /* not a text input */ }
+  }
+}
+
+let renderQueued = false;
+function renderAll() {
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => { renderQueued = false; renderNow(); });
+}
+
+function renderNow() {
+  const snap = captureFocus();
+  const doc = activeDoc();
+
+  // Shell is built once; regions are swapped in place so the table scroller and
+  // its scroll offset survive every re-render.
+  if (!appEl.firstChild) {
+    appEl.appendChild(el("div#region-ribbon"));
+    appEl.appendChild(el("div#region-topbar"));
+    const body = el("div.x-body#region-body");
+    body.appendChild(el("div.x-tablewrap#region-table"));
+    body.appendChild(el("div#region-detail", { style: { display: "contents" } }));
+    appEl.appendChild(body);
+    appEl.appendChild(el("div#region-dock"));
+  }
+
+  swap("region-ribbon", renderRibbon());
+  swap("region-topbar", renderTopBar());
+  renderTableRegion(doc);
+  swap("region-detail", renderDetailPanel());
+  swap("region-dock", renderDock());
+  renderOverlay();
+
+  restoreFocus(snap);
+}
+
+function swap(id, node) {
+  const host = document.getElementById(id);
+  clear(host);
+  if (node) add(host, [node]);
+}
+
+/* ── Tooltip ─────────────────────────────────────────────────────────────── */
+let tipEl = null, tipTimer = null;
+function attachTip(node, html) {
+  if (!html) return node;
+  node.addEventListener("pointerenter", () => {
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(() => showTip(node, html), 380);
+  });
+  node.addEventListener("pointerleave", hideTip);
+  node.addEventListener("pointerdown", hideTip);
+  node.addEventListener("focus", () => showTip(node, html));
+  node.addEventListener("blur", hideTip);
+  return node;
+}
+function showTip(node, html) {
+  hideTip();
+  if (!node.isConnected) return;
+  tipEl = el("div.x-tooltip", { html });
+  document.body.appendChild(tipEl);
+  const r = node.getBoundingClientRect();
+  const t = tipEl.getBoundingClientRect();
+  const vw = window.innerWidth / (state.zoom || 1);
+  const vh = window.innerHeight / (state.zoom || 1);
+  let left = r.left + r.width / 2 - t.width / 2;
+  left = Math.max(6, Math.min(left, vw - t.width - 6));
+  let top = r.bottom + 6;
+  if (top + t.height > vh - 6) top = r.top - t.height - 6;
+  tipEl.style.left = left + "px";
+  tipEl.style.top = top + "px";
+}
+function hideTip() {
+  clearTimeout(tipTimer);
+  if (tipEl) { tipEl.remove(); tipEl = null; }
+}
+
+/* ── Copy + toast ────────────────────────────────────────────────────────── */
+let toastTimer = null;
+function copyText(text, label) {
+  const done = () => showToast(label || "Copied");
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+  } else fallbackCopy(text, done);
+}
+function fallbackCopy(text, done) {
+  const ta = el("textarea", { style: { position: "fixed", opacity: "0", pointerEvents: "none" } });
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); } catch { /* ignore */ }
+  ta.remove();
+  done();
+}
+function showToast(msg) {
+  let host = document.querySelector(".x-detailbody");
+  if (!host) host = document.body;
+  const existing = host.querySelector(".copied-toast");
+  if (existing) existing.remove();
+  const t = el("div.copied-toast", null, msg);
+  host.appendChild(t);
+  requestAnimationFrame(() => t.classList.add("is-visible"));
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    t.classList.remove("is-visible");
+    setTimeout(() => t.remove(), 200);
+  }, 1200);
+}
+
+/* ── Overlay (popovers + menus) ──────────────────────────────────────────── */
+function openOverlay(kind, anchor, extra) {
+  const rect = anchor && anchor.getBoundingClientRect
+    ? anchor.getBoundingClientRect()
+    : anchor; // already a rect-like {left, top, bottom, right, width, height}
+  state.overlay = Object.assign({ kind, rect }, extra || {});
+  hideTip();
+  renderAll();
+}
+function closeOverlay() {
+  if (!state.overlay) return;
+  state.overlay = null;
+  renderAll();
+}
+function toggleOverlay(kind, anchor, extra) {
+  if (state.overlay && state.overlay.kind === kind) closeOverlay();
+  else openOverlay(kind, anchor, extra);
+}
+
+function renderOverlay() {
+  clear(overlayEl);
+  const o = state.overlay;
+  if (!o) return;
+  const content = OVERLAYS[o.kind] ? OVERLAYS[o.kind](o) : null;
+  if (!content) { state.overlay = null; return; }
+  const scrim = el("div.x-scrim", { onmousedown: (e) => { if (e.target === scrim) closeOverlay(); } });
+  overlayEl.appendChild(scrim);
+  overlayEl.appendChild(content);
+  positionFloating(content, o.rect, o.align || "end");
+}
+
+/** Place a floating panel under its anchor, flipping/clamping to the viewport. */
+function positionFloating(node, rect, align) {
+  node.style.visibility = "hidden";
+  const b = node.getBoundingClientRect();
+  const gap = 6;
+  const vw = window.innerWidth / (state.zoom || 1);
+  const vh = window.innerHeight / (state.zoom || 1);
+  let top = rect.bottom + gap;
+  if (top + b.height > vh - 8) {
+    const above = rect.top - b.height - gap;
+    top = above >= 8 ? above : Math.max(8, vh - b.height - 8);
+  }
+  let left = align === "start" ? rect.left : rect.right - b.width;
+  left = Math.max(8, Math.min(left, vw - b.width - 8));
+  node.style.top = top + "px";
+  node.style.left = left + "px";
+  node.style.visibility = "";
+}
+
+const OVERLAYS = {};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WIDGETS
+   ═════════════════════════════════════════════════════════════════════════ */
+
+function fbtn(o) {
+  const cls = ["f-btn"];
+  if (o.appearance === "primary") cls.push("primary");
+  if (o.appearance === "subtle") cls.push("subtle");
+  if (o.size === "sm") cls.push("sm");
+  if (!o.label) cls.push("icon-only");
+  if (o.checked) cls.push("checked");
+  if (o.className) cls.push(o.className);
+  const b = el("button", {
+    class: cls.join(" "),
+    type: "button",
+    disabled: !!o.disabled,
+    "aria-pressed": o.checked !== undefined ? String(!!o.checked) : null,
+    "aria-label": o.ariaLabel || (!o.label && typeof o.tip === "string" ? o.tip.replace(/<[^>]+>/g, "") : null),
+    onclick: o.disabled ? null : o.onclick,
+  }, o.icon ? el("span", { html: o.icon, style: { display: "inline-flex" } }) : null, o.label || null, o.extra || null);
+  return attachTip(b, o.tip);
+}
+
+function finput(o) {
+  const wrap = el("div", { class: "f-input" + (o.size === "md" ? " md" : "") + (o.className ? " " + o.className : ""), style: o.style || null });
+  const input = el("input", {
+    type: o.type || "text",
+    value: o.value === undefined || o.value === null ? "" : String(o.value),
+    placeholder: o.placeholder || "",
+    "aria-label": o.ariaLabel || o.placeholder || "",
+    "data-k": o.key || null,
+    title: o.title || null,
+    oninput: o.oninput ? (e) => o.oninput(e.target.value, e) : null,
+    onkeydown: o.onkeydown || null,
+  });
+  wrap.appendChild(input);
+  if (o.contentAfter) add(wrap, [o.contentAfter]);
+  return wrap;
+}
+
+function fswitch(checked, onchange, o) {
+  o = o || {};
+  const b = el("button", {
+    class: "f-switch" + (o.armed ? " armed" : ""),
+    type: "button", role: "switch",
+    "aria-checked": String(!!checked),
+    "aria-label": o.ariaLabel || "toggle",
+    disabled: !!o.disabled,
+    onclick: o.disabled ? null : () => onchange(!checked),
+  });
+  return attachTip(b, o.tip);
+}
+
+function fcheck(checked, label, onchange, o) {
+  o = o || {};
+  return attachTip(el("span", {
+    class: "f-check" + (o.className ? " " + o.className : ""),
+    role: "checkbox", tabindex: "0",
+    "aria-checked": String(!!checked),
+    onclick: () => onchange(!checked),
+    onkeydown: (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); onchange(!checked); } },
+  }, el("span.box", { html: ICON.check }), label), o.tip);
+}
+
+function fselect(o) {
+  const s = el("select", {
+    class: "f-select" + (o.className ? " " + o.className : ""),
+    style: o.style || null,
+    "aria-label": o.ariaLabel || "",
+    "data-k": o.key || null,
+    onchange: (e) => o.onchange(e.target.value),
+  });
+  for (const opt of o.options) {
+    s.appendChild(el("option", { value: opt.value, selected: opt.value === o.value }, opt.label));
+  }
+  return s;
+}
+
+function ftextarea(o) {
+  return el("textarea", {
+    class: "f-textarea", rows: String(o.rows || 2),
+    placeholder: o.placeholder || "", "data-k": o.key || null,
+    oninput: (e) => o.oninput(e.target.value),
+  }, o.value || "");
+}
+
+/** A segmented mode toggle; `keep` renders quiet so only real overrides pop. */
+function kindToggle(modes, current, onpick, o) {
+  o = o || {};
+  const wrap = el("div.x-kindtoggle", { role: "group", "aria-label": o.ariaLabel || "" });
+  for (const m of modes) {
+    const active = current === m;
+    const quiet = active && m === "keep";
+    wrap.appendChild(el("button", {
+      class: "x-kindbtn" + (active ? (quiet ? " keep" : " active") : "") + (o.seg ? " x-legseg" : ""),
+      type: "button", "aria-pressed": String(active),
+      onclick: () => onpick(m),
+    }, o.reserve
+      ? el("span.x-reserve", null, el("span", null, m), el("span.ghost", { "aria-hidden": "true" }, m))
+      : m));
+  }
+  return wrap;
+}
+
+function menuItem(label, onclick, o) {
+  o = o || {};
+  return el("button.x-menuitem", { type: "button", disabled: !!o.disabled, onclick: o.disabled ? null : onclick },
+    o.checkable ? el("span.tick", { html: o.checked ? ICON.check : "" }) : null,
+    o.icon ? el("span", { html: o.icon, style: { display: "inline-flex" } }) : null,
+    label);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DEMO RIBBON
+   ═════════════════════════════════════════════════════════════════════════ */
+
+function renderRibbon() {
+  if (state.ribbonDismissed) return null;
+  return el("div.x-demoribbon", null,
+    el("span", null, el("b", null, "Interactive UI demo"), " — no backend. ",
+      "Press ", el("b", null, "Start"), " to stream synthetic rows; every host, tag and message is fictional."),
+    el("span.spacer"),
+    el("button", { type: "button", onclick: () => { state.ribbonDismissed = true; renderAll(); } }, "Dismiss"));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOP BAR
+   ═════════════════════════════════════════════════════════════════════════ */
+
+const KIND_FILTERS = [
+  { key: "logs", label: "Logs" },
+  { key: "both", label: "Both" },
+  { key: "network", label: "Network" },
+];
+
+function countCustomizations() {
+  const c = state.config;
+  return (c.captureUlsLogs === false ? 1 : 0)
+    + BUILTIN_CLASSES.filter((k) => c.builtinsEnabled[k] === false).length
+    + c.mitmHosts.filter((h) => h.builtin && !h.enabled).length
+    + c.mitmHosts.filter((h) => !h.builtin).length
+    + c.classificationRules.length
+    + c.faultRules.length;
+}
+
+function renderTopBar() {
+  const doc = activeDoc();
+  const cap = state.capture;
+  const isRunning = cap.status === "running" || cap.status === "starting";
+  const isTransitioning = cap.status === "starting" || cap.status === "stopping";
+  const showFindNav = state.searchMode === "find" && !!state.searchText;
+
+  const rows = visibleRows();
+  const matches = findMatchIndexes(rows);
+  const findCount = matches.length;
+  const findIndex = findCount ? Math.min(state.findActiveIndex, findCount - 1) : 0;
+
+  const primaryLabel = isRunning ? "Stop"
+    : doc && doc.kind === "har" ? "Start"
+    : doc && doc.status === "frozen" ? "Continue"
+    : doc && doc.status === "error" ? "Retry"
+    : "Start";
+  const primaryTip = isRunning ? "Stop the live capturing tab"
+    : doc && doc.kind === "har" ? "Start a live capture in a new tab"
+    : doc && doc.status === "frozen" ? "Continue capturing in this tab"
+    : doc && doc.status === "error" ? "Retry capture in this tab"
+    : "Start capturing in this tab";
+
+  const custom = countCustomizations();
+  const armed = !!state.config.chaosEnabled;
+  const badgeText = custom > 0 ? String(custom) : "";
+
+  const bar = el("div.x-topbar", null,
+    el("div.x-leftgroup", null,
+      attachTip(el("span.x-mark", { html: ICON.logo, "aria-label": "Inspector" }), "Inspector"),
+      el("div.x-vdiv", { role: "separator" }),
+
+      el("div.x-zone", null,
+        fbtn({
+          icon: isRunning ? ICON.stop : ICON.play,
+          label: primaryLabel, appearance: "primary", tip: primaryTip, disabled: isTransitioning,
+          onclick: () => {
+            if (isRunning) stopCapture();
+            else startCapture(doc && doc.kind === "capture" ? doc.id : undefined);
+          },
+        }),
+        fbtn({
+          icon: ICON.trash, label: "Clear", appearance: "subtle",
+          tip: doc && doc.kind === "har" ? "HAR tabs are read-only" : "Clear every run from this capture",
+          disabled: !doc || doc.kind === "har",
+          onclick: () => {
+            if (!doc) return;
+            doc.rows = []; doc.runs = []; doc.nextRun = 1; doc.markerSeq = 0;
+            state.selectedEventId = undefined;
+            state.spanZoom = false;
+            if (tableEls.scroller) tableEls.scroller.scrollTop = 0;
+            renderAll();
+          },
+        })),
+
+      el("div.x-vdiv", { role: "separator" }),
+
+      // Capture config — the gear, with its customization / armed badge.
+      fbtn({
+        icon: ICON.gear, label: "Capture", appearance: "subtle", className: "x-capturebtn",
+        tip: "Configure what the proxy decrypts and records",
+        onclick: (e) => toggleOverlay("capture", e.currentTarget),
+        extra: custom > 0 || armed
+          ? el("span", {
+              class: "x-badge" + (armed ? " armed" : "") + (!badgeText ? " dot" : ""),
+              "aria-label": [custom > 0 ? custom + " capture customizations" : "", armed ? "chaos armed" : ""].filter(Boolean).join(", "),
+            }, badgeText)
+          : null,
+      }),
+
+      el("div.x-vdiv", { role: "separator" }),
+
+      el("div.x-zone", null,
+        fbtn({
+          icon: ICON.columns, appearance: "subtle", tip: "Show / hide columns",
+          onclick: (e) => toggleOverlay("columns", e.currentTarget),
+        }),
+        fbtn({
+          icon: ICON.span, appearance: "subtle",
+          tip: "Span — show only rows between the last two markers",
+          checked: state.spanZoom,
+          disabled: markerCount(doc) < 2 || state.sort !== undefined,
+          onclick: () => { state.spanZoom = !state.spanZoom; renderAll(); },
+        }),
+        el("span.x-mcpwrap", null,
+          fbtn({
+            icon: ICON.plug, appearance: "subtle",
+            tip: "MCP — connect an AI client (Claude / Copilot) to triage the capture",
+            onclick: (e) => toggleOverlay("mcp", e.currentTarget.closest(".x-mcpwrap")),
+          }),
+          state.mcp.enabled ? el("span.x-mcpdot", { "aria-label": "MCP enabled" }) : null)),
+
+      fbtn({
+        icon: ICON.more, appearance: "subtle", tip: "More — load / export",
+        onclick: (e) => toggleOverlay("more", e.currentTarget),
+      })),
+
+    el("div.x-vdiv", { role: "separator" }),
+
+    el("div.x-filtergroup", null,
+      el("div.x-segmented", { role: "group", "aria-label": "Filter rows by type" },
+        KIND_FILTERS.map((f) => el("button", {
+          class: "x-segment" + (state.rowKindFilter === f.key ? " active" : ""),
+          type: "button", "aria-pressed": String(state.rowKindFilter === f.key),
+          onclick: () => { state.rowKindFilter = f.key; renderAll(); },
+        }, f.label))),
+
+      finput({
+        className: "x-searchbox", key: "search",
+        value: state.searchText,
+        placeholder: state.searchMode === "find"
+          ? "Find — Enter / Shift+Enter to step"
+          : "Filter message, eventId, source, session…",
+        oninput: (v) => { state.searchText = v; state.findActiveIndex = 0; renderAll(); },
+        onkeydown: (e) => {
+          if (state.searchMode === "find" && e.key === "Enter") {
+            e.preventDefault();
+            stepMatch(e.shiftKey ? -1 : 1);
+          }
+        },
+        contentAfter: el("div.x-contentafter", null,
+          showFindNav ? [
+            el("div.x-findnav", null,
+              el("span.x-findcount", null, findCount > 0 ? (findIndex + 1) + " / " + findCount : "0 / 0"),
+              attachTip(el("button.x-findnavbtn", {
+                type: "button", disabled: findCount === 0, "aria-label": "Previous match",
+                html: ICON.chevUp, onclick: () => stepMatch(-1),
+              }), "Previous match (Shift+Enter)"),
+              attachTip(el("button.x-findnavbtn", {
+                type: "button", disabled: findCount === 0, "aria-label": "Next match",
+                html: ICON.chevDown, onclick: () => stepMatch(1),
+              }), "Next match (Enter)")),
+            el("div.x-minidiv"),
+          ] : null,
+          fbtn({
+            size: "sm", appearance: "subtle",
+            icon: state.searchMode === "find" ? ICON.search : ICON.filter,
+            tip: state.searchMode === "find"
+              ? "Find — highlights matches without hiding. Click to switch to Filter."
+              : "Filter — hides rows that don't match. Click to switch to Find.",
+            ariaLabel: state.searchMode === "find" ? "Find mode — click to switch to Filter" : "Filter mode — click to switch to Find",
+            onclick: () => { state.searchMode = state.searchMode === "find" ? "filter" : "find"; state.findActiveIndex = 0; renderAll(); },
+          }),
+          fbtn({
+            size: "sm", appearance: "subtle", icon: ICON.eyeOff,
+            className: state.muteRules.length ? "checked" : "",
+            checked: state.muteRules.length > 0,
+            tip: state.muteRules.length
+              ? "Mute — " + state.muteRules.length + " rule" + (state.muteRules.length > 1 ? "s" : "") + " hiding rows (click to manage)"
+              : "Mute — hide noisy rows by tag or message",
+            onclick: (e) => toggleOverlay("mute", e.currentTarget),
+          })),
+      })));
+  return bar;
+}
+
+function stepMatch(dir) {
+  const rows = visibleRows();
+  const matches = findMatchIndexes(rows);
+  if (!matches.length) return;
+  let i = state.findActiveIndex + dir;
+  if (i < 0) i = matches.length - 1;
+  if (i >= matches.length) i = 0;
+  state.findActiveIndex = i;
+  state.followingTail = false;
+  scrollRowIntoView(matches[i], true);
+  renderAll();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OVERLAY: Columns menu
+   ═════════════════════════════════════════════════════════════════════════ */
+
+OVERLAYS.columns = () => {
+  const m = el("div.x-menu");
+  for (const c of COLUMN_DEFS) {
+    m.appendChild(menuItem(c.label, () => {
+      state.columnVisible[c.id] = !state.columnVisible[c.id];
+      renderAll();
+    }, { checkable: true, checked: state.columnVisible[c.id] }));
+  }
+  m.appendChild(el("div.x-menudivider"));
+  m.appendChild(menuItem("Reset column widths", () => {
+    state.columnWidths = defaultWidths();
+    closeOverlay();
+  }));
+  return m;
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OVERLAY: More menu (Load HAR / Export JSON)
+   ═════════════════════════════════════════════════════════════════════════ */
+
+OVERLAYS.more = () => {
+  const doc = activeDoc();
+  const m = el("div.x-menu");
+  m.appendChild(menuItem("Load sample HAR…", () => {
+    const d = createDocument("har", "sample-session.har");
+    seedRows(d, 320, "har");
+    d.status = "idle";
+    state.activeDocumentId = d.id;
+    state.selectedEventId = undefined;
+    state.followingTail = true;
+    closeOverlay();
+  }, { icon: ICON.folder }));
+  m.appendChild(menuItem("Export JSON…", () => {
+    if (!doc) return;
+    exportDocument(doc);
+    closeOverlay();
+  }, { icon: ICON.download, disabled: !doc }));
+  return m;
+};
+
+/** Download the active document as the app's schema-v2 export shape. */
+function exportDocument(doc) {
+  const payload = {
+    schemaVersion: 2,
+    exportedAt: new Date().toISOString(),
+    note: "Synthetic data from the Inspector UI demo — not real telemetry.",
+    document: { id: doc.id, title: doc.title, kind: doc.kind, status: doc.status },
+    runs: doc.runs,
+    rows: doc.rows,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = el("a", { href: url, download: doc.title.replace(/[^\w.-]+/g, "-") + ".json" });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  showToast("Exported " + doc.rows.length.toLocaleString() + " rows");
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OVERLAY: Mute popover
+   ═════════════════════════════════════════════════════════════════════════ */
+
+OVERLAYS.mute = () => {
+  const d = state.drafts;
+  const addDraft = () => {
+    const v = d.muteDraft.trim();
+    if (!v) return;
+    d.muteDraft = "";
+    addMuteRule({ kind: "regex", value: v });
+  };
+  return el("div.x-popover", null, el("div.x-mute", null,
+    el("span.x-mutetitle", null, "Muted events"),
+    state.muteRules.length === 0
+      ? el("span.x-muteempty", null, "Nothing muted. Right-click a row → “Mute this tag” / “Mute this message”, or add a message regex below.")
+      : el("div.x-mutelist", null, state.muteRules.map((r) =>
+          el("div.x-muterow2", null,
+            el("span.x-mutekind", null, r.kind),
+            el("span.x-muteval", { title: r.value }, r.value),
+            fbtn({ icon: ICON.dismiss, size: "sm", appearance: "subtle", tip: "Remove", onclick: () => removeMuteRule(r) })))),
+    el("div.x-addrow", null,
+      finput({
+        key: "mute-draft", value: d.muteDraft, placeholder: "message regex…", style: { flex: "1" },
+        oninput: (v) => { d.muteDraft = v; renderAll(); },
+        onkeydown: (e) => { if (e.key === "Enter") addDraft(); },
+      }),
+      fbtn({ size: "sm", icon: ICON.addSm, label: "Add", disabled: !d.muteDraft.trim(), onclick: addDraft })),
+    el("div.x-muteactions", null,
+      fbtn({ size: "sm", appearance: "subtle", label: "Mute known noise", onclick: () => { KNOWN_NOISE.forEach(addMuteRule); } }),
+      state.muteRules.length > 0
+        ? fbtn({ size: "sm", appearance: "subtle", label: "Clear all", onclick: () => { state.muteRules = []; renderAll(); } })
+        : null)));
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OVERLAY: MCP popover
+   ═════════════════════════════════════════════════════════════════════════ */
+
+const MCP_SERVER_NAME = "inspector-demo";
+const MCP_NOTICE = "A local, read-only MCP server that exposes the capture to an AI client (Claude Code / Copilot CLI) through triage tools — summarize, query, and inspect rows. Off by default; binds to 127.0.0.1 only; cannot start capture or change anything.";
+const MCP_TOOLS = "summarize_capture · query_rows · get_row · get_recent · list_sessions · get_capture_state";
+
+OVERLAYS.mcp = () => {
+  const enabled = state.mcp.enabled;
+  const url = state.mcp.url;
+  const claudeCmd = "claude mcp add --transport http " + MCP_SERVER_NAME + " " + url;
+  const copilotCmd = "copilot mcp add --transport http " + MCP_SERVER_NAME + " " + url;
+  const jsonCmd = JSON.stringify({ mcpServers: { [MCP_SERVER_NAME]: { type: "http", url } } }, null, 2);
+  const copyBtn = (text, label) => fbtn({
+    size: "sm", appearance: "subtle", icon: ICON.copy, label: label, tip: "Copy",
+    onclick: () => copyText(text, "Copied"),
+  });
+
+  return el("div.x-popover", null, el("div.x-mcp", null,
+    el("div.x-cfghdr", null,
+      el("span.x-mcptitle", null, "MCP triage server"),
+      attachTip(el("span.x-info", { html: ICON.info, tabindex: "0", "aria-label": "About the MCP triage server" }), MCP_NOTICE),
+      el("div", { style: { marginLeft: "auto" } },
+        fswitch(enabled, (v) => { state.mcp.enabled = v; renderAll(); }, { ariaLabel: "Enable MCP server" }))),
+    el("span.x-hint", null, enabled
+      ? "Listening on 127.0.0.1 — read-only, 6 tools."
+      : "Off — a local, read-only endpoint for an AI client."),
+    enabled ? [
+      el("div.x-urlrow", null, el("span.x-url", { title: url }, url), copyBtn(url)),
+      el("span.x-cfglabel", null, "Connect a client"),
+      el("div.x-cmdrow", null, el("span.x-cmdlabel", null, "Claude Code"), el("span.x-cmd", { title: claudeCmd }, claudeCmd), copyBtn(claudeCmd)),
+      el("div.x-cmdrow", null, el("span.x-cmdlabel", null, "Copilot CLI"), el("span.x-cmd", { title: copilotCmd }, copilotCmd), copyBtn(copilotCmd)),
+      el("div.x-cmdrow", null,
+        el("span.x-cmdlabel", null, "JSON config"),
+        el("span.x-hint", { style: { flex: "1", minWidth: "0" } }, "for .mcp.json / ~/.copilot/mcp-config.json"),
+        copyBtn(jsonCmd, "Copy")),
+      el("span.x-cfglabel", null, "Example usage"),
+      el("span.x-hint", null, "“summarize the current capture with " + MCP_SERVER_NAME + "”"),
+      el("span.x-tools", null, MCP_TOOLS),
+    ] : null,
+    el("hr.f-divider"),
+    el("div.x-cfgfooter", null,
+      el("span.x-path", { title: "%APPDATA%/Inspector/mcp-endpoint.json" }, "%APPDATA%/Inspector/mcp-endpoint.json"),
+      fbtn({ size: "sm", appearance: "subtle", label: "Reveal file", onclick: () => showToast("Demo — no file to reveal") }))));
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CAPTURE CONFIG — helpers
+   ═════════════════════════════════════════════════════════════════════════ */
+
+const DECRYPT_NOTICE = "Decrypting a host intercepts all of its HTTPS while capturing — it can interfere with other apps that use the same host. Turn a host off to alleviate. Adding a domain decrypts it the same way; broader patterns (like *.example.com) intercept more.";
+const RECORD_NOTICE = "What becomes a network row. Built-in recipes (toggle on/off) plus your own rules — each records a decrypted host's requests, optionally filtered by URL, under a Category. Decrypt the host first; recording is what surfaces it.";
+const CHAOS_NOTICE = "Fault injection — make matching requests fail so you can watch how the app (and its logs) react. Off by default: arm it, attach a fault to a recorded request type (its Category — the entries under Record above), optionally narrowed by URL substring / HTTP method, then run your scenario. Live capture only; the real upstream response is kept on every faulted row for comparison.";
+const REQ_ACTION_INFO = {
+  forward: "Send the request upstream — optionally editing its body, headers, or URL (a full URL incl. host, to redirect it) first.",
+  block: "Don't contact the server at all. The client's response is authored below (Respond), or the connection is closed (Drop).",
+};
+const KIND_INFO = {
+  respond: "Deliver a response — optionally tampered: override the status, edit the body (empty / truncate / replace), and/or edit the headers. No edits + a delay = a slow real response.",
+  drop: "Close the connection — no response (a transport failure: the app's request rejects rather than getting a bad status). With a delay, the connection is held first, then closed. Shows a status-0 “Closed (chaos)” row.",
+};
+
+const MAX_REGEX_SOURCE_LEN = 400;
+function isReservedLabel(label) {
+  const l = label.trim().toLowerCase();
+  return BUILTIN_CLASSES.some((c) => c.toLowerCase() === l);
+}
+function isLikelyCatastrophicRegex(src) {
+  if (src.length > MAX_REGEX_SOURCE_LEN) return true;
+  return /\([^)]*[+*][^)]*\)[+*]/.test(src);
+}
+function normalizeDomainInput(raw) {
+  let s = String(raw || "").trim().toLowerCase();
+  s = s.replace(/^[a-z]+:\/\//, "").replace(/\/.*$/, "").replace(/:\d+$/, "").replace(/\.$/, "");
+  if (!s) return { error: "Enter a domain." };
+  if (!/^[a-z0-9*.-]+$/.test(s)) return { error: "Only letters, digits, dots, hyphens and * are allowed." };
+  if (!s.includes(".")) return { error: "That doesn't look like a domain." };
+  return { value: s };
+}
+function hostMatchesGlob(host, glob) {
+  const re = new RegExp("^" + glob.split("*").map(escapeRegex).join(".*") + "$", "i");
+  return re.test(host);
+}
+function hostRuleFor(hostname) {
+  return state.config.mitmHosts.find((h) => h.hostnames.some((g) => hostMatchesGlob(hostname, g)));
+}
+function hostLabelFor(hostId) {
+  const h = state.config.mitmHosts.find((x) => x.id === hostId);
+  return h ? h.label : "(host removed)";
+}
+
+/** Summarize a fault rule the way the app's rule list does. */
+function faultSummary(f) {
+  const narrow = [f.methods && f.methods.length ? f.methods.join("/") : null, f.urlContains ? "“" + f.urlContains + "”" : null]
+    .filter(Boolean).join(" · ");
+  const reqParts = [];
+  if (f.request && f.request.action === "block") reqParts.push("block");
+  else if (f.request) {
+    if (f.request.url) reqParts.push("redirect");
+    if (f.request.body) reqParts.push("req body");
+    if (f.request.headers) reqParts.push("req headers");
+  }
+  let action;
+  if (f.kind === "drop") action = "drop";
+  else {
+    const parts = [];
+    if (f.status != null) parts.push("status " + f.status);
+    if (f.body) parts.push(f.body.mode === "replace" ? "body replaced" : "body " + (f.body.mode === "empty" ? "emptied" : "truncated"));
+    if (f.headers) parts.push(f.headers.mode === "empty" ? "headers emptied" : "headers overridden");
+    action = parts.length ? parts.join(" + ") : "respond";
+  }
+  if (f.delaySec) action += " +" + f.delaySec + "s";
+  const req = reqParts.length ? reqParts.join(" + ") + " → " : "";
+  return f.targetClass + (narrow ? " · " + narrow : "") + " → " + req + action + " · " + Math.round(f.probability * 100) + "%";
+}
+
+function parseHeaderLines(text) {
+  const out = {};
+  for (const line of String(text || "").split(/\r?\n/)) {
+    const i = line.indexOf(":");
+    if (i <= 0) continue;
+    const k = line.slice(0, i).trim();
+    if (k) out[k] = line.slice(i + 1).trim();
+  }
+  return out;
+}
+function parsePercent(s) {
+  const n = Number.parseFloat(s);
+  if (!Number.isFinite(n)) return 1;
+  const p = n / 100;
+  return p < 0 ? 0 : p > 1 ? 1 : p;
+}
+function clampFaultStatus(n) { const v = Number.parseInt(n, 10); return Number.isFinite(v) ? Math.max(100, Math.min(599, v)) : DEFAULT_FAULT_STATUS; }
+function clampDelaySec(n) { const v = Number.parseFloat(n); return Number.isFinite(v) ? Math.max(0, Math.min(300, v)) : 0; }
+
+/** Categories a fault may target = built-ins + enabled Record-entry labels. */
+function availableClasses() {
+  const set = new Set(BUILTIN_CLASSES);
+  for (const r of state.config.classificationRules) if (r.label && r.enabled) set.add(r.label);
+  return Array.from(set);
+}
+
+/** Build the fault rule the draft currently describes. */
+function composeDraftRule() {
+  const d = state.drafts;
+  const rule = {
+    id: "f-" + hex(6),
+    enabled: true,
+    targetClass: d.faultClass,
+    probability: parsePercent(d.faultProb),
+    kind: d.faultKind,
+  };
+  if (d.faultUrl.trim()) rule.urlContains = d.faultUrl.trim();
+  if (d.faultMethods.length) rule.methods = d.faultMethods.slice();
+  const delay = clampDelaySec(d.faultDelay);
+  if (delay) rule.delaySec = delay;
+
+  const req = { action: d.reqAction };
+  if (d.reqAction === "forward") {
+    if (d.reqUrlMode === "replace" && d.reqUrl.trim()) req.url = { mode: "replace", url: d.reqUrl.trim() };
+    if (d.reqHeaderMode === "empty") req.headers = { mode: "empty" };
+    else if (d.reqHeaderMode === "override") req.headers = { mode: "override", entries: parseHeaderLines(d.reqHeaders) };
+    if (d.reqBodyMode === "empty") req.body = { mode: "empty" };
+    else if (d.reqBodyMode === "truncate") req.body = { mode: "truncate" };
+    else if (d.reqBodyMode === "replace") req.body = { mode: "replace", text: d.reqBody };
+  }
+  rule.request = req;
+
+  if (d.faultKind === "respond") {
+    if (d.reqAction === "block") rule.status = clampFaultStatus(d.faultStatus);
+    else if (d.statusMode === "set") rule.status = clampFaultStatus(d.faultStatus);
+    if (d.headerMode === "empty") rule.headers = { mode: "empty" };
+    else if (d.headerMode === "override") rule.headers = { mode: "override", entries: parseHeaderLines(d.faultHeaders) };
+    if (d.bodyMode === "empty") rule.body = { mode: "empty" };
+    else if (d.bodyMode === "truncate") rule.body = { mode: "truncate" };
+    else if (d.bodyMode === "replace") rule.body = { mode: "replace", text: d.faultBody };
+  }
+  return rule;
+}
+
+function resetFaultDraft() {
+  const d = state.drafts;
+  Object.assign(d, {
+    faultClass: "", faultUrl: "", showUrlContains: false, faultMethods: [],
+    faultProb: "100", faultDelay: "0",
+    reqAction: "block", reqUrlMode: "keep", reqUrl: "", reqHeaderMode: "keep", reqHeaders: "",
+    reqBodyMode: "keep", reqBody: "",
+    faultKind: "drop", statusMode: "keep", faultStatus: String(DEFAULT_FAULT_STATUS),
+    headerMode: "keep", faultHeaders: "", bodyMode: "keep", faultBody: "",
+  });
+}
+
+/** Classify a pasted URL the way the proxy would, for the Test a URL box. */
+function classifyTestUrl(raw) {
+  let u;
+  try { u = new URL(raw.trim()); } catch { return { cls: undefined, decrypted: false, bad: true }; }
+  const host = u.hostname;
+  const rule = hostRuleFor(host);
+  const decrypted = !!(rule && rule.enabled);
+  const p = u.pathname.toLowerCase();
+  const on = (c) => state.config.builtinsEnabled[c] !== false;
+  let cls;
+  if (rule) {
+    if (rule.id === "liveapp") {
+      if (on("Thumbnail") && p.includes("getthumbnailurl.ashx")) cls = "Thumbnail";
+      else if (on("Session") && p.includes("/session.aspx")) cls = "Session";
+      else if (on("Items") && p.includes("/items")) cls = "Items";
+    } else if (rule.id === "cdn" && on("Asset")) cls = "Asset";
+    else if (rule.id === "media" && on("Media") && p.includes("/transform")) cls = "Media";
+    else if (rule.id === "drive" && on("Embed") && p.includes("/embed.aspx")) cls = "Embed";
+  }
+  if (!cls) {
+    for (const r of state.config.classificationRules) {
+      if (!r.enabled || !rule || r.hostId !== rule.id) continue;
+      const v = (r.match.value || "").trim();
+      if (!v) { cls = r.label; break; }
+      if (r.match.kind === "regex") {
+        try { if (new RegExp(v, "i").test(u.href)) { cls = r.label; break; } } catch { /* bad regex */ }
+      } else if (u.href.toLowerCase().includes(v.toLowerCase())) { cls = r.label; break; }
+    }
+  }
+  return { cls, decrypted };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   OVERLAY: Capture config
+   ═════════════════════════════════════════════════════════════════════════ */
+
+OVERLAYS.capture = () => {
+  const c = state.config;
+  const d = state.drafts;
+  const classes = availableClasses();
+  const isForward = d.reqAction === "forward";
+
+  const addDomain = () => {
+    const n = normalizeDomainInput(d.domain);
+    if (n.error) { d.domainError = n.error; renderAll(); return; }
+    if (c.mitmHosts.some((h) => h.hostnames.includes(n.value))) { d.domainError = "That domain is already listed."; renderAll(); return; }
+    const id = "u-" + hex(6);
+    c.mitmHosts = c.mitmHosts.concat([{ id, label: n.value, hostnames: [n.value], enabled: true, builtin: false }]);
+    if (d.domainRecord) {
+      c.classificationRules = c.classificationRules.concat([{
+        id: "r-" + hex(6), hostId: id, label: n.value.replace(/^\*\./, "").split(".")[0] || n.value,
+        enabled: true, match: { kind: "url-substring", value: "" },
+      }]);
+    }
+    d.domain = ""; d.domainError = "";
+    renderAll();
+  };
+
+  const addRule = () => {
+    const label = d.recordLabel.trim();
+    if (!label) return;
+    if (isReservedLabel(label)) { d.recordError = "“" + label + "” is a built-in Category — pick another name."; renderAll(); return; }
+    if (d.recordKind === "regex" && d.recordValue.trim()) {
+      if (isLikelyCatastrophicRegex(d.recordValue.trim())) { d.recordError = "That regex could backtrack catastrophically — simplify it."; renderAll(); return; }
+      try { new RegExp(d.recordValue.trim()); } catch { d.recordError = "Invalid regular expression."; renderAll(); return; }
+    }
+    c.classificationRules = c.classificationRules.concat([{
+      id: "r-" + hex(6), hostId: d.recordHost, label, enabled: true,
+      match: { kind: d.recordKind, value: d.recordValue.trim() },
+    }]);
+    d.recordLabel = ""; d.recordValue = ""; d.recordError = "";
+    renderAll();
+  };
+
+  const draftInvalid = !d.faultClass
+    || (d.faultKind === "respond" && d.reqAction === "block" && !d.faultStatus.trim());
+  const draftSummary = d.faultClass ? faultSummary(composeDraftRule()) : "pick a Category…";
+
+  const panel = el("div.x-cfg", null,
+
+    /* ── LOGS ── */
+    el("div.x-cfghdr", null, el("span.x-cfglabel", null, "Logs")),
+    el("div.x-listrow", null,
+      el("div.x-listtext", null,
+        el("span.x-listname", null, "ULS logs"),
+        el("span.x-listsub", null, "RemoteLogs.ashx → decoded log rows · the primary capture")),
+      fswitch(c.captureUlsLogs !== false, (v) => { c.captureUlsLogs = v; renderAll(); }, { ariaLabel: "Capture ULS logs" })),
+
+    el("hr.f-divider"),
+
+    /* ── DECRYPT ── */
+    el("div.x-cfghdr", null,
+      el("span.x-cfglabel", null, "Decrypt"),
+      attachTip(el("span.x-info", { html: ICON.info, tabindex: "0", "aria-label": "About decrypting hosts" }), DECRYPT_NOTICE)),
+    el("div.x-list", null, c.mitmHosts.map((h) =>
+      el("div.x-listrow", null,
+        el("div.x-listtext", null,
+          el("span.x-listname", { title: h.label }, h.label),
+          el("span.x-listsub", { title: h.hostnames.join(" · ") }, h.hostnames.join(" · "))),
+        el("div.x-listctl", null,
+          h.builtin ? null : fbtn({
+            icon: ICON.dismiss, size: "sm", appearance: "subtle", tip: "Remove domain",
+            onclick: () => {
+              c.mitmHosts = c.mitmHosts.filter((x) => x.id !== h.id);
+              c.classificationRules = c.classificationRules.filter((r) => r.hostId !== h.id);
+              if (d.recordHost === h.id) d.recordHost = "";
+              renderAll();
+            },
+          }),
+          fswitch(h.enabled, (v) => { h.enabled = v; renderAll(); }, { ariaLabel: "Decrypt " + h.label }))))),
+    el("div.x-addrow", null,
+      finput({
+        key: "cfg-domain", value: d.domain, placeholder: "add a domain…  e.g. contoso.com", style: { flex: "1" },
+        oninput: (v) => { d.domain = v; d.domainError = ""; renderAll(); },
+        onkeydown: (e) => { if (e.key === "Enter") addDomain(); },
+      }),
+      fcheck(d.domainRecord, "Record", (v) => { d.domainRecord = v; renderAll(); },
+        { tip: "Also create a Record entry for this domain so its requests show up as rows (editable below)." }),
+      fbtn({ size: "sm", icon: ICON.addSm, label: "Add", disabled: !d.domain.trim(), onclick: addDomain })),
+    d.domainError ? el("span.x-err", null, d.domainError) : null,
+    el("span.x-hint", null, "Decrypt changes apply on the next Start. Decrypting alone doesn’t show rows — record them under Record below."),
+
+    el("hr.f-divider"),
+
+    /* ── RECORD AS NETWORK ROWS ── */
+    el("div.x-cfghdr", null,
+      el("span.x-cfglabel", null, "Record as network rows"),
+      attachTip(el("span.x-info", { html: ICON.info, tabindex: "0", "aria-label": "About network-row recording" }), RECORD_NOTICE)),
+    el("div.x-list", null, BUILTIN_CLASSES.map((cls) =>
+      el("div.x-listrow", null,
+        el("div.x-listtext", null,
+          el("span.x-listname", null, cls),
+          el("span.x-listsub", { title: BUILTIN_CLASS_INFO[cls] }, BUILTIN_CLASS_INFO[cls])),
+        fswitch(c.builtinsEnabled[cls] !== false, (v) => { c.builtinsEnabled[cls] = v; renderAll(); }, { ariaLabel: "Record " + cls })))),
+
+    el("span.x-hint", null, "Custom rules — record a decrypted host’s requests under a Category. Leave the URL blank to record all of them."),
+    c.classificationRules.length ? el("div.x-list", null, c.classificationRules.map((r) =>
+      el("div.x-listrow", null,
+        el("div.x-listtext", null,
+          el("span.x-listname", { title: r.label }, r.label),
+          el("span.x-listsub", { title: hostLabelFor(r.hostId) + " · " + (r.match.value || "all requests") },
+            hostLabelFor(r.hostId) + " · " + (r.match.value || "all requests"))),
+        el("div.x-listctl", null,
+          fbtn({
+            icon: ICON.dismiss, size: "sm", appearance: "subtle", tip: "Remove rule",
+            onclick: () => { c.classificationRules = c.classificationRules.filter((x) => x.id !== r.id); renderAll(); },
+          }),
+          fswitch(r.enabled, (v) => { r.enabled = v; renderAll(); }, { ariaLabel: "Enable rule " + r.label }))))) : null,
+
+    el("div.x-addarea", null,
+      el("div.x-addrow", null,
+        fselect({
+          key: "cfg-recordhost", value: d.recordHost, ariaLabel: "Host to record", style: { flex: "1", minWidth: "0" },
+          options: [{ value: "", label: "on host…" }].concat(c.mitmHosts.map((h) => ({ value: h.id, label: h.label }))),
+          onchange: (v) => { d.recordHost = v; renderAll(); },
+        }),
+        finput({
+          key: "cfg-recordlabel", value: d.recordLabel, placeholder: "label (Category)", style: { width: "120px" },
+          oninput: (v) => { d.recordLabel = v; d.recordError = ""; renderAll(); },
+        })),
+      el("div.x-addrow", null,
+        kindToggle(["url-substring", "regex"], d.recordKind, (m) => { d.recordKind = m; renderAll(); }, { ariaLabel: "Match kind" }),
+        finput({
+          key: "cfg-recordvalue", value: d.recordValue, style: { flex: "1" },
+          placeholder: d.recordKind === "regex" ? "url regex…  e.g. /items$" : "url substring…  e.g. /live/items",
+          oninput: (v) => { d.recordValue = v; d.recordError = ""; renderAll(); },
+          onkeydown: (e) => { if (e.key === "Enter") addRule(); },
+        }),
+        fbtn({ size: "sm", icon: ICON.addSm, label: "Add", disabled: !d.recordLabel.trim() || !d.recordHost, onclick: addRule }))),
+    d.recordError ? el("span.x-err", null, d.recordError) : null,
+
+    el("hr.f-divider"),
+
+    /* ── CHAOS ── */
+    el("div.x-cfghdr", null,
+      el("span.x-cfglabel", null, "Chaos — fault injection"),
+      attachTip(el("span.x-info", { html: ICON.info, tabindex: "0", "aria-label": "About chaos fault injection" }), CHAOS_NOTICE),
+      el("div", { style: { marginLeft: "auto", display: "flex", alignItems: "center" } },
+        fswitch(!!c.chaosEnabled, (v) => { c.chaosEnabled = v; renderAll(); }, {
+          armed: true, ariaLabel: "Arm chaos",
+          tip: c.chaosEnabled
+            ? "Armed — matching requests are faulted on the live client. Click to disarm."
+            : "Off — nothing fires until you arm. Configure faults below, then arm. Click to arm.",
+        }))),
+
+    c.faultRules.length ? el("div.x-rulelist", null, c.faultRules.map((f) =>
+      el("div.x-rulerow", null,
+        el("span.x-rulevalue", { title: faultSummary(f) }, faultSummary(f)),
+        el("div.x-listctl", null,
+          fbtn({
+            icon: ICON.dismiss, size: "sm", appearance: "subtle", tip: "Remove fault",
+            onclick: () => { c.faultRules = c.faultRules.filter((x) => x.id !== f.id); renderAll(); },
+          }),
+          fswitch(f.enabled, (v) => { f.enabled = v; renderAll(); }, { ariaLabel: "Enable fault" }))))) : null,
+
+    el("div.x-chaoseditor", null,
+      /* Match — which recorded requests to fault */
+      el("div.x-chaosgroup", null,
+        el("span.x-hint", null, "Only decrypted + recorded requests can be faulted. To fault something new, add it under Decrypt / Record above."),
+        el("div", null,
+          el("div.x-chaosfield", null,
+            fselect({
+              key: "cfg-faultclass", value: d.faultClass, ariaLabel: "Category to fault", style: { flex: "1", minWidth: "0" },
+              options: [{ value: "", label: "Category…" }].concat(classes.map((x) => ({ value: x, label: x }))),
+              onchange: (v) => { d.faultClass = v; renderAll(); },
+            }),
+            fbtn({
+              size: "sm", appearance: "subtle", label: "URL filter", className: "x-rightcol",
+              checked: d.showUrlContains, tip: "Only fault requests whose URL contains this text",
+              onclick: () => { d.showUrlContains = !d.showUrlContains; renderAll(); },
+            })),
+          el("div", { class: "x-urlreveal" + (d.showUrlContains ? " open" : ""), "aria-hidden": String(!d.showUrlContains) },
+            finput({
+              key: "cfg-faulturl", value: d.faultUrl, placeholder: "url contains…", className: "x-fullwidth",
+              oninput: (v) => { d.faultUrl = v; renderAll(); },
+            }))),
+        el("div.x-chaosfield", null,
+          methodPicker(d),
+          finput({
+            key: "cfg-faultprob", type: "number", value: d.faultProb, className: "x-rightcol",
+            title: "Probability % — how often a matching request is faulted", ariaLabel: "Probability percent",
+            oninput: (v) => { d.faultProb = v; renderAll(); },
+            contentAfter: el("span.x-suffix", null, "%"),
+          }),
+          finput({
+            key: "cfg-faultdelay", type: "number", value: d.faultDelay, className: "x-rightcol",
+            title: "Delay before the response / close, in seconds (0 = none)", ariaLabel: "Delay seconds", placeholder: "0",
+            oninput: (v) => { d.faultDelay = v; renderAll(); },
+            contentAfter: el("span.x-suffix", null, "s"),
+          }))),
+
+      /* Request leg */
+      el("div.x-chaosgroup", null,
+        el("div.x-leghead", null,
+          attachTip(el("span.x-leglabel", { tabindex: "0" }, "Request"),
+            "<b>Block</b> — " + REQ_ACTION_INFO.block + "<br><b>Forward</b> — " + REQ_ACTION_INFO.forward),
+          kindToggle(["block", "forward"], d.reqAction, (m) => { d.reqAction = m; if (m === "block" && d.headerMode === "keep") d.headerMode = "empty"; if (m === "block" && d.bodyMode === "keep") d.bodyMode = "empty"; renderAll(); }, { seg: true, ariaLabel: "Request action" })),
+        isForward ? el("div.x-legchildren", null,
+          el("div.x-chaosfield", null,
+            el("span.x-sublabel", null, "url"),
+            kindToggle(["keep", "replace"], d.reqUrlMode, (m) => { d.reqUrlMode = m; renderAll(); }, { reserve: true, ariaLabel: "Request URL edit" })),
+          d.reqUrlMode === "replace" ? finput({
+            key: "cfg-requrl", value: d.reqUrl, className: "x-fullwidth",
+            placeholder: "https://host/path — full URL, incl. host (redirect)",
+            oninput: (v) => { d.reqUrl = v; renderAll(); },
+          }) : null,
+          el("div.x-chaosfield", null,
+            el("span.x-sublabel", null, "headers"),
+            kindToggle(["keep", "empty", "override"], d.reqHeaderMode, (m) => { d.reqHeaderMode = m; renderAll(); }, { reserve: true, ariaLabel: "Request header edit" })),
+          d.reqHeaderMode === "override" ? ftextarea({
+            key: "cfg-reqheaders", value: d.reqHeaders, placeholder: "header overrides — one per line, e.g. X-Test: 1",
+            oninput: (v) => { d.reqHeaders = v; },
+          }) : null,
+          el("div.x-chaosfield", null,
+            el("span.x-sublabel", null, "body"),
+            kindToggle(["keep", "empty", "truncate", "replace"], d.reqBodyMode, (m) => { d.reqBodyMode = m; renderAll(); }, { reserve: true, ariaLabel: "Request body edit" })),
+          d.reqBodyMode === "replace" ? ftextarea({
+            key: "cfg-reqbody", value: d.reqBody, placeholder: "custom request body",
+            oninput: (v) => { d.reqBody = v; },
+          }) : null) : null),
+
+      /* Response leg */
+      el("div.x-chaosgroup", null,
+        el("div.x-leghead", null,
+          attachTip(el("span.x-leglabel", { tabindex: "0" }, "Response"),
+            "<b>Drop</b> — " + KIND_INFO.drop + "<br><b>Respond</b> — " + KIND_INFO.respond),
+          kindToggle(["drop", "respond"], d.faultKind, (m) => { d.faultKind = m; renderAll(); }, { seg: true, ariaLabel: "Response action" })),
+        d.faultKind === "respond" ? el("div.x-legchildren", null,
+          el("div.x-chaosfield", null,
+            el("span.x-sublabel", null, "status"),
+            d.reqAction === "block"
+              ? finput({
+                  key: "cfg-faultstatus", type: "number", value: d.faultStatus, className: "x-numchip", placeholder: "503",
+                  title: "Status code for the authored response (required)", ariaLabel: "Response status (required)",
+                  oninput: (v) => { d.faultStatus = v; renderAll(); },
+                })
+              : [
+                  kindToggle(["keep", "set"], d.statusMode, (m) => { d.statusMode = m; renderAll(); }, { reserve: true, ariaLabel: "Status edit" }),
+                  d.statusMode === "set" ? finput({
+                    key: "cfg-faultstatus", type: "number", value: d.faultStatus, className: "x-numchip", placeholder: "500",
+                    title: "Status code (100–599)", ariaLabel: "Response status",
+                    oninput: (v) => { d.faultStatus = v; renderAll(); },
+                  }) : null,
+                ]),
+          el("div.x-chaosfield", null,
+            el("span.x-sublabel", null, "headers"),
+            kindToggle(d.reqAction === "block" ? ["empty", "override"] : ["keep", "empty", "override"],
+              d.headerMode, (m) => { d.headerMode = m; renderAll(); }, { reserve: true, ariaLabel: "Header edit" })),
+          d.headerMode === "override" ? ftextarea({
+            key: "cfg-faultheaders", value: d.faultHeaders, placeholder: "header overrides — one per line, e.g. Content-Type: text/plain",
+            oninput: (v) => { d.faultHeaders = v; },
+          }) : null,
+          el("div.x-chaosfield", null,
+            el("span.x-sublabel", null, "body"),
+            kindToggle(d.reqAction === "block" ? ["empty", "replace"] : ["keep", "empty", "truncate", "replace"],
+              d.bodyMode, (m) => { d.bodyMode = m; renderAll(); }, { reserve: true, ariaLabel: "Body edit" })),
+          d.bodyMode === "replace" ? ftextarea({
+            key: "cfg-faultbody", value: d.faultBody, placeholder: "custom response body",
+            oninput: (v) => { d.faultBody = v; },
+          }) : null) : null),
+
+      /* Commit */
+      el("div.x-commitfoot", null,
+        el("span", { class: "x-rulevalue" + (d.faultClass ? "" : " x-previewmuted"), title: d.faultClass ? draftSummary : null }, draftSummary),
+        fbtn({
+          size: "sm", icon: ICON.addSm, label: "Add fault", disabled: draftInvalid,
+          onclick: () => { c.faultRules = c.faultRules.concat([composeDraftRule()]); resetFaultDraft(); renderAll(); },
+        }))),
+
+    el("hr.f-divider"),
+
+    /* ── TEST A URL ── */
+    el("span.x-cfglabel", null, "Test a URL"),
+    el("div.x-addrow", null,
+      finput({
+        key: "cfg-testurl", value: d.testUrl, placeholder: "paste a request URL…", style: { flex: "1" },
+        oninput: (v) => { d.testUrl = v; d.testOutcome = undefined; renderAll(); },
+        onkeydown: (e) => { if (e.key === "Enter") { d.testOutcome = classifyTestUrl(d.testUrl); renderAll(); } },
+      }),
+      fbtn({ size: "sm", label: "Test", disabled: !d.testUrl.trim(), onclick: () => { d.testOutcome = classifyTestUrl(d.testUrl); renderAll(); } })),
+    d.testOutcome ? (
+      d.testOutcome.bad ? el("span.x-testno", null, "— Not a valid URL.")
+        : d.testOutcome.cls && d.testOutcome.decrypted ? el("span.x-testok", null, "✓ captured as " + d.testOutcome.cls)
+        : d.testOutcome.cls ? el("span.x-testno", null, "Matches “" + d.testOutcome.cls + "”, but this host isn’t decrypted — not captured.")
+        : el("span.x-testno", null, "— Not matched by any rule.")
+    ) : null,
+
+    el("hr.f-divider"),
+
+    el("div.x-cfgfooter", null,
+      attachTip(el("span.x-path", null, "%APPDATA%/Inspector/capture-config.json"), "%APPDATA%/Inspector/capture-config.json"),
+      fbtn({ size: "sm", appearance: "subtle", label: "Reveal file", onclick: () => showToast("Demo — no file to reveal") })));
+
+  return el("div.x-popover", null, panel);
+};
+
+/** Multiselect for HTTP methods — an inline popup so it stays inside the panel. */
+function methodPicker(d) {
+  const label = d.faultMethods.length ? d.faultMethods.join(", ") : "any method";
+  const wrap = el("div.x-methods", null,
+    el("button", {
+      class: "f-select", type: "button", "aria-label": "HTTP methods (optional)",
+      style: { width: "100%", textAlign: "left", cursor: "pointer", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: d.faultMethods.length ? "var(--fg1)" : "var(--fg4)" },
+      onclick: () => { d.methodsOpen = !d.methodsOpen; renderAll(); },
+    }, label));
+  if (d.methodsOpen) {
+    const list = el("div", {
+      style: {
+        position: "absolute", top: "26px", left: "0", zIndex: "5", minWidth: "130px",
+        maxHeight: "190px", overflowY: "auto", background: "var(--bg1)",
+        border: "1px solid var(--stroke2)", borderRadius: "var(--r-md)", boxShadow: "var(--shadow8)", padding: "4px",
+      },
+    });
+    for (const m of HTTP_METHODS) {
+      const on = d.faultMethods.includes(m);
+      list.appendChild(menuItem(m, () => {
+        d.faultMethods = on ? d.faultMethods.filter((x) => x !== m) : d.faultMethods.concat([m]);
+        renderAll();
+      }, { checkable: true, checked: on }));
+    }
+    wrap.appendChild(list);
+  }
+  return wrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TABLE
+   ═════════════════════════════════════════════════════════════════════════ */
+
+const ROW_PAD_X = 16;
+let suppressScrollEvents = false;
+/** Mounted table rows, index → { node, sig }. Lets renderRowsOnly reuse nodes. */
+let mountedRows = new Map();
+
+function visibleColumns() { return COLUMN_DEFS.filter((c) => state.columnVisible[c.id]); }
+function naturalRowWidth() {
+  return visibleColumns().reduce((n, c) => n + state.columnWidths[c.id], 0) + ROW_PAD_X;
+}
+function isLiveCapturing() {
+  return state.capture.liveDocumentId === state.activeDocumentId
+    && (state.capture.status === "running" || state.capture.status === "starting");
+}
+
+function ensureTableEls() {
+  if (tableEls.root && tableEls.docId === state.activeDocumentId) return;
+  const headerScroll = el("div.x-headerscroll");
+  const headerViewport = el("div.x-headerviewport", null, headerScroll);
+  const spacer = el("div.x-spacer");
+  const scroller = el("div.x-scroller", null, spacer);
+  const listWrap = el("div.x-listwrap", null, scroller);
+  const root = el("div.x-table", null, headerViewport, listWrap);
+
+  scroller.addEventListener("scroll", () => {
+    headerScroll.style.transform = "translateX(" + -scroller.scrollLeft + "px)";
+    syncDockScrollbar();
+    if (suppressScrollEvents) return;
+    const max = scroller.scrollHeight - scroller.clientHeight;
+    const atBottom = max - scroller.scrollTop <= 4;
+    if (atBottom !== state.followingTail) { state.followingTail = atBottom; renderAll(); }
+    else renderRowsOnly();
+    scroller.classList.add("is-scrolling");
+    clearTimeout(scroller._st);
+    scroller._st = setTimeout(() => scroller.classList.remove("is-scrolling"), 900);
+  }, { passive: true });
+
+  // Shift+wheel (and horizontal wheel) scrolls the table sideways.
+  scroller.addEventListener("wheel", (e) => {
+    const raw = e.deltaX !== 0 ? e.deltaX : e.shiftKey ? e.deltaY : 0;
+    if (raw === 0 || scroller.scrollWidth <= scroller.clientWidth) return;
+    const max = scroller.scrollWidth - scroller.clientWidth;
+    const next = Math.max(0, Math.min(max, scroller.scrollLeft + raw));
+    if (next === scroller.scrollLeft) return;
+    scroller.scrollLeft = next;
+    if (e.shiftKey) e.preventDefault();
+  }, { passive: false });
+
+  Object.assign(tableEls, { root, headerScroll, header: null, scroller, spacer, listWrap, docId: state.activeDocumentId });
+  mountedRows = new Map();
+}
+
+function renderTableRegion(doc) {
+  const host = document.getElementById("region-table");
+  const hasData = doc && doc.rows.some(isDataRow);
+
+  if (!hasData) {
+    tableEls.root = null; tableEls.scroller = null; tableEls.docId = null;
+    mountedRows = new Map();
+    clear(host);
+    host.appendChild(renderEmptyState());
+    return;
+  }
+
+  ensureTableEls();
+  if (host.firstChild !== tableEls.root) { clear(host); host.appendChild(tableEls.root); }
+
+  // Header
+  clear(tableEls.headerScroll);
+  tableEls.headerScroll.style.width = Math.max(naturalRowWidth(), tableEls.scroller.clientWidth || 0) + "px";
+  tableEls.headerScroll.appendChild(renderHeaderRow());
+
+  renderRowsOnly();
+
+  // Live pill + filtered-empty hint live above the list.
+  const old = tableEls.root.querySelectorAll(".x-livepill, .x-filteredhint");
+  old.forEach((n) => n.remove());
+  const rows = visibleRows();
+  if (!rows.length) tableEls.root.appendChild(renderFilteredHint());
+  if (!state.followingTail && rows.length > 0 && !state.spanZoom) {
+    tableEls.root.appendChild(el("button.x-livepill", {
+      type: "button",
+      onclick: () => {
+        state.followingTail = true;
+        scrollToBottom();
+        renderAll();
+      },
+    }, "↓ Live"));
+  }
+}
+
+function scrollToBottom() {
+  const s = tableEls.scroller;
+  if (!s) return;
+  suppressScrollEvents = true;
+  s.scrollTop = s.scrollHeight - s.clientHeight;
+  requestAnimationFrame(() => { suppressScrollEvents = false; });
+}
+
+function scrollRowIntoView(index, center) {
+  const s = tableEls.scroller;
+  if (!s) return;
+  const target = center
+    ? index * ROW_HEIGHT - s.clientHeight / 2 + ROW_HEIGHT / 2
+    : index * ROW_HEIGHT;
+  suppressScrollEvents = true;
+  s.scrollTop = Math.max(0, Math.min(target, s.scrollHeight - s.clientHeight));
+  requestAnimationFrame(() => { suppressScrollEvents = false; });
+}
+
+/** Re-render just the visible window — the hot path during scroll.
+ *
+ *  Rows are reused rather than rebuilt: a node whose signature is unchanged is
+ *  left in the DOM untouched. That keeps node identity stable across the ~3/sec
+ *  streaming re-renders, so a click that straddles a batch still lands (a
+ *  rebuilt node would drop the click, since mousedown and mouseup would hit
+ *  different elements). */
+function renderRowsOnly() {
+  const s = tableEls.scroller;
+  if (!s) return;
+  const rows = visibleRows();
+  const cols = visibleColumns();
+  const rowWidth = Math.max(naturalRowWidth(), s.clientWidth || 0);
+
+  tableEls.spacer.style.height = rows.length * ROW_HEIGHT + "px";
+  tableEls.spacer.style.width = rowWidth + "px";
+  tableEls.headerScroll.style.width = rowWidth + "px";
+
+  const matches = findMatchIndexes(rows);
+  const matchSet = matches.length ? new Set(matches) : null;
+  const activeIdx = matches.length ? matches[Math.min(state.findActiveIndex, matches.length - 1)] : -1;
+
+  if (state.followingTail && !suppressScrollEvents) {
+    const max = s.scrollHeight - s.clientHeight;
+    if (max - s.scrollTop > 4) { suppressScrollEvents = true; s.scrollTop = max; requestAnimationFrame(() => { suppressScrollEvents = false; }); }
+  }
+
+  const viewH = s.clientHeight || 400;
+  const first = Math.max(0, Math.floor(s.scrollTop / ROW_HEIGHT) - OVERSCAN);
+  const last = Math.min(rows.length, Math.ceil((s.scrollTop + viewH) / ROW_HEIGHT) + OVERSCAN);
+
+  const colKey = cols.map((c) => c.id + ":" + state.columnWidths[c.id]).join(",");
+  const needed = new Set();
+
+  for (let i = first; i < last; i++) {
+    needed.add(i);
+    const row = rows[i];
+    const sig = [
+      row.id, i, rowWidth, colKey,
+      row.id === state.selectedEventId ? 1 : 0,
+      matchSet && matchSet.has(i) ? 1 : 0,
+      i === activeIdx ? 1 : 0,
+      freshIds.has(row.id) ? 1 : 0,
+    ].join("|");
+    const cur = mountedRows.get(i);
+    if (cur && cur.sig === sig) continue;
+    const node = renderRow(row, i, cols, rowWidth, matchSet, activeIdx);
+    if (cur) {
+      cur.node.replaceWith(node);
+    } else {
+      // Insert in index order so DOM order tracks visual order (tab order,
+      // querySelector determinism) even though rows are absolutely positioned.
+      let ref = null;
+      for (let j = i + 1; j < last; j++) {
+        const m = mountedRows.get(j);
+        if (m) { ref = m.node; break; }
+      }
+      tableEls.spacer.insertBefore(node, ref);
+    }
+    mountedRows.set(i, { node, sig });
+  }
+
+  for (const [i, m] of Array.from(mountedRows)) {
+    if (!needed.has(i)) { m.node.remove(); mountedRows.delete(i); }
+  }
+}
+
+function renderRow(row, index, cols, rowWidth, matchSet, activeIdx) {
+  const top = index * ROW_HEIGHT + "px";
+  const entering = freshIds.has(row.id) ? " row-entering" : "";
+
+  if (row.kind === "marker") {
+    return el("div", {
+      class: "x-markerrow" + entering,
+      style: { top, width: rowWidth + "px" },
+      oncontextmenu: (e) => { e.preventDefault(); openRowMenu(row, e.clientX, e.clientY); },
+    },
+      el("span.x-markerlabel", null, "◆ " + row.label),
+      el("span.x-markerrule"),
+      el("span.x-markertime", null, formatTime(row.timestamp)));
+  }
+
+  if (row.kind === "run-boundary") {
+    return el("div", { class: "x-runrow", style: { top, width: rowWidth + "px" } },
+      el("span", null, "Run " + row.runNumber + " · " + (row.truncated ? "earlier rows truncated" : "continued " + formatTime(row.timestamp))),
+      el("span.x-runrule"));
+  }
+
+  const selected = row.id === state.selectedEventId;
+  const isMatch = matchSet && matchSet.has(index);
+  const isActive = index === activeIdx;
+  const cls = ["x-row"];
+  if (isMatch) cls.push("match");
+  if (selected) cls.push("selected");
+  if (isActive) cls.push("activematch");
+
+  const node = el("div", {
+    class: cls.join(" ") + entering,
+    style: { top, width: rowWidth + "px" },
+    onclick: () => {
+      state.selectedEventId = state.selectedEventId === row.id ? undefined : row.id;
+      state.detailFind = { open: false, text: "", index: 0 };
+      renderAll();
+    },
+    oncontextmenu: (e) => { e.preventDefault(); openRowMenu(row, e.clientX, e.clientY); },
+  });
+  for (const col of cols) {
+    node.appendChild(el("div.x-cellwrap", { style: { width: state.columnWidths[col.id] + "px" } }, col.render(row)));
+  }
+  return node;
+}
+
+function renderHeaderRow() {
+  const cols = visibleColumns();
+  const sortDisabled = isLiveCapturing();
+  const rowEl = el("div.x-headerrow");
+  for (const col of cols) {
+    const active = state.sort && state.sort.columnId === col.id;
+    const glyph = active ? (state.sort.direction === "asc" ? "▲" : "▼") : "";
+    const cell = el("div.x-hcell", { style: { width: state.columnWidths[col.id] + "px" } },
+      el("div", {
+        class: "x-hlabel" + (sortDisabled ? " disabled" : ""),
+        title: sortDisabled ? "Sorting is disabled during live capture — Stop first" : "Sort by " + col.label,
+        onclick: sortDisabled ? null : () => {
+          if (!active) state.sort = { columnId: col.id, direction: "asc" };
+          else if (state.sort.direction === "asc") state.sort = { columnId: col.id, direction: "desc" };
+          else state.sort = undefined;
+          if (state.sort) state.spanZoom = false;
+          renderAll();
+        },
+      }, col.label, glyph ? el("span.x-sortglyph", null, glyph) : null),
+      el("div.x-resize", {
+        onpointerdown: (e) => startColumnResize(e, col),
+      }));
+    rowEl.appendChild(cell);
+  }
+  return rowEl;
+}
+
+function startColumnResize(e, col) {
+  e.preventDefault();
+  const handle = e.currentTarget;
+  handle.classList.add("dragging");
+  const startX = e.clientX;
+  const startW = state.columnWidths[col.id];
+  const move = (ev) => {
+    state.columnWidths[col.id] = Math.max(col.minWidth, startW + (ev.clientX - startX));
+    renderTableRegion(activeDoc());
+  };
+  const up = () => {
+    document.removeEventListener("pointermove", move);
+    document.removeEventListener("pointerup", up);
+    handle.classList.remove("dragging");
+    renderAll();
+  };
+  document.addEventListener("pointermove", move);
+  document.addEventListener("pointerup", up);
+}
+
+/* ── Row context menu ────────────────────────────────────────────────────── */
+function openRowMenu(row, x, y) {
+  openOverlay("rowmenu", { left: x, right: x, top: y, bottom: y, width: 0, height: 0 }, { row, align: "start" });
+}
+OVERLAYS.rowmenu = (o) => {
+  const row = o.row;
+  const m = el("div.x-menu");
+  if (row.kind === "marker") {
+    m.appendChild(menuItem("Remove this marker", () => { removeMarker(row.id); closeOverlay(); }));
+  } else {
+    m.appendChild(menuItem("Insert marker here", () => { insertMarkerAtRow(row.id); closeOverlay(); }));
+    if (row.kind === "log") {
+      m.appendChild(el("div.x-menudivider"));
+      m.appendChild(menuItem("Mute this tag", () => { addMuteRule({ kind: "tag", value: row.eventTag || row.eventIdHex }); closeOverlay(); }));
+      m.appendChild(menuItem("Mute this message", () => { addMuteRule({ kind: "regex", value: escapeRegex(row.message) }); closeOverlay(); }));
+    }
+  }
+  return m;
+};
+
+/* ── Empty states ────────────────────────────────────────────────────────── */
+function renderEmptyState() {
+  const running = state.capture.status === "running";
+  return el("div.x-empty", null,
+    el("div.glyph", null, "◉"),
+    el("div.heading", null, running ? "Waiting for telemetry…" : "No logs yet"),
+    el("div.body", null, running
+      ? "Capture is running. In the real app you'd start a Contoso Live session in any host and its traces would appear here — in this demo, synthetic rows are already on their way."
+      : "Click Start to stream synthetic telemetry — or Load sample HAR from the ⋯ menu to inspect a saved trace."),
+    el("ul", null,
+      el("li", null, "Captures HTTPS POSTs to ", el("code", null, "*.liveapp.contoso.com/telemetry/RemoteLogs.ashx")),
+      el("li", null, "One-time root cert install on first Start (no admin required)"),
+      el("li", null, "System proxy is set on Start and restored on Stop")),
+    el("div.cta", null,
+      fbtn({
+        icon: ICON.play, label: "Start", appearance: "primary",
+        disabled: state.capture.status !== "idle",
+        onclick: () => { const d = activeDoc(); startCapture(d && d.kind === "capture" ? d.id : undefined); },
+      }),
+      fbtn({
+        icon: ICON.folder, label: "Load sample HAR",
+        onclick: () => {
+          const d = createDocument("har", "sample-session.har");
+          seedRows(d, 320, "har");
+          state.activeDocumentId = d.id;
+          state.followingTail = true;
+          renderAll();
+        },
+      })));
+}
+
+function renderFilteredHint() {
+  const active = [];
+  if (state.rowKindFilter !== "both") {
+    active.push({ label: "Showing " + (state.rowKindFilter === "logs" ? "Logs" : "Network") + " only", clear: () => { state.rowKindFilter = "both"; renderAll(); } });
+  }
+  if (state.searchMode === "filter" && state.searchText) {
+    active.push({ label: "Filter: “" + state.searchText + "”", clear: () => { state.searchText = ""; renderAll(); } });
+  }
+  if (state.muteRules.length) {
+    active.push({ label: "Always-hide: " + state.muteRules.length, clear: () => { state.muteRules = []; renderAll(); } });
+  }
+  if (state.spanZoom) {
+    active.push({ label: "Span", clear: () => { state.spanZoom = false; renderAll(); } });
+  }
+  const hiddenKind = state.rowKindFilter === "logs" ? "Network" : "Log";
+
+  return el("div.x-filteredhint", null,
+    el("div.heading", null, active.length ? "No rows match the current view" : "No rows to show"),
+    active.length ? [
+      el("div.sub", null, "These filters are hiding rows — clear any to bring them back:"),
+      el("div.x-chips", null, active.map((a) =>
+        el("button.x-chip", { type: "button", onclick: a.clear }, a.label, el("span.xx", null, "✕")))),
+      active.length > 1 ? el("button.x-reset", { type: "button", onclick: clearViewFilters }, "Reset all view filters") : null,
+      state.rowKindFilter !== "both"
+        ? el("div.x-note", null, hiddenKind + " rows are hidden by this filter. If rows you expect still don’t appear, they may not be recorded — check ", el("strong", null, "Capture"), ".")
+        : null,
+    ] : el("div.sub", null, "Nothing to display right now."));
+}
+
+/* ── Dock horizontal scrollbar sync ──────────────────────────────────────── */
+let dockBar = null;
+function syncDockScrollbar() {
+  const s = tableEls.scroller;
+  if (!dockBar || !s || !dockBar.track.isConnected) return;
+  const trackW = dockBar.track.clientWidth;
+  if (!trackW) return;
+  const range = s.scrollWidth - s.clientWidth;
+  if (range <= 1) return;
+  const thumbW = Math.max(24, Math.round(trackW * (s.clientWidth / s.scrollWidth)));
+  const travel = Math.max(0, trackW - thumbW);
+  dockBar.thumb.style.width = thumbW + "px";
+  dockBar.thumb.style.left = Math.round((s.scrollLeft / range) * travel) + "px";
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DETAILS PANEL
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/** Click-to-copy value. Plain click copies; the hover tint is the affordance. */
+function copyable(value, children, cls) {
+  return el("span", {
+    class: "copyable" + (cls ? " " + cls : ""),
+    title: "Click to copy",
+    onclick: (e) => { e.stopPropagation(); copyText(value, "Copied"); },
+  }, children === undefined ? value : children);
+}
+
+function payloadBlock(text) {
+  return el("div.x-payloadwrap.copy-host", null,
+    el("pre.x-payload", null, text),
+    el("span.copy-reveal", null,
+      fbtn({ size: "sm", appearance: "subtle", icon: ICON.copy, tip: "Copy", onclick: () => copyText(text, "Copied") })));
+}
+
+function detectMessageFormat(message) {
+  const t = (message || "").trim();
+  if (looksLikeJson(t)) { try { return { kind: "json", value: JSON.parse(t) }; } catch { /* fall through */ } }
+  const i = t.indexOf("{");
+  if (i > 0) {
+    const tail = t.slice(i);
+    if (looksLikeJson(tail)) { try { return { kind: "prefix-json", prefix: t.slice(0, i).trim(), value: JSON.parse(tail) }; } catch { /* fall through */ } }
+  }
+  return { kind: "plain" };
+}
+function messageSectionLabel(f) {
+  return f.kind === "json" ? "(parsed JSON)" : f.kind === "prefix-json" ? "(prefix + JSON)" : "";
+}
+
+/** Section open state, keyed per row; a Find hit forces its section open. */
+function sectionOpen(rowId, id, defaultOpen, searchable) {
+  const key = rowId + ":" + id;
+  const q = state.detailFind.open ? state.detailFind.text.trim().toLowerCase() : "";
+  if (q && searchable && searchable.toLowerCase().includes(q)) return true;
+  return state.sections[key] === undefined ? defaultOpen : state.sections[key];
+}
+function toggleSection(rowId, id, defaultOpen) {
+  const key = rowId + ":" + id;
+  const cur = state.sections[key] === undefined ? defaultOpen : state.sections[key];
+  state.sections[key] = !cur;
+  renderAll();
+}
+
+function collapsibleTitle(rowId, id, title, open, defaultOpen, meta) {
+  return el("div.x-sectiontitle.x-collapse", {
+    onclick: () => toggleSection(rowId, id, defaultOpen),
+    role: "button", tabindex: "0",
+    onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSection(rowId, id, defaultOpen); } },
+  },
+    el("span", { style: { display: "inline-flex", alignItems: "center", gap: "5px" } },
+      el("span", { html: ICON.chevRight, style: { display: "inline-flex", transform: open ? "rotate(90deg)" : "none", transition: "transform 120ms" } }),
+      title),
+    meta ? el("span", { style: { fontWeight: "400", textTransform: "none", letterSpacing: "0", color: "var(--fg4)" } }, meta) : null);
+}
+
+function headerSection(rowId, id, title, headers, redacted) {
+  const keys = Object.keys(headers || {});
+  const searchable = keys.map((k) => k + " " + headers[k]).join("\n");
+  const open = sectionOpen(rowId, id, id === "res-headers", searchable);
+  const out = [collapsibleTitle(rowId, id, title, open, id === "res-headers", keys.length + (keys.length === 1 ? " header" : " headers"))];
+  if (open) {
+    out.push(keys.length
+      ? el("div.x-headertable", null, keys.map((k) => [
+          el("span.x-hdrkey", null, k),
+          copyable(headers[k], headers[k], "x-hdrval"),
+        ]))
+      : el("div.x-hint", { style: { padding: "6px 0" } }, "No headers."));
+    if (redacted && redacted.length) {
+      out.push(el("div.x-redacted", null, "Redacted for safety: " + redacted.join(", ") + " — removed at capture time, never stored."));
+    }
+  }
+  return out;
+}
+
+function bodyTypeMeta(body, contentType) {
+  if (!body) return "";
+  switch (body.kind) {
+    case "empty": return "empty";
+    case "json": return "json · " + formatBytes(new Blob([body.text]).size);
+    case "text": return body.subtype + " · " + formatBytes(new Blob([body.text]).size);
+    case "binary": return "binary · " + formatBytes(body.sizeBytes);
+    case "multipart": return "multipart/" + body.subtype + " · " + body.parts.length + (body.parts.length === 1 ? " part" : " parts");
+    case "omitted": return "not captured (" + body.reason + ") · " + formatBytes(body.sizeBytes);
+    case "unavailable": return "unavailable · " + formatBytes(body.sizeBytes);
+    default: return contentType || "";
+  }
+}
+
+function bodySearchable(body) {
+  if (!body) return "";
+  if (body.kind === "json" || body.kind === "text") return body.text;
+  if (body.kind === "multipart") return body.parts.map((p) => (p.name || "") + " " + (p.text || "")).join("\n");
+  return "";
+}
+
+function renderBodyContent(body, contentType) {
+  if (!body || body.kind === "empty") return el("div.x-hint", { style: { padding: "6px 0" } }, "No body.");
+  if (body.kind === "json") return [payloadBlock(prettyJsonText(body.text)), truncNote(body.truncated)];
+  if (body.kind === "text") {
+    const text = looksLikeJson(body.text) ? prettyJsonText(body.text) : body.text;
+    return [payloadBlock(text), truncNote(body.truncated)];
+  }
+  if (body.kind === "binary") return el("div.x-hint", { style: { padding: "6px 0" } }, "Binary body — " + body.contentType + " · " + formatBytes(body.sizeBytes) + ". Not captured.");
+  if (body.kind === "omitted") return el("div.x-hint", { style: { padding: "6px 0" } }, "Body omitted (" + body.reason + ") — " + body.contentType + " · " + formatBytes(body.sizeBytes) + ". Size is recorded; bytes are not.");
+  if (body.kind === "unavailable") return el("div.x-hint", { style: { padding: "6px 0" } }, "Body bytes were not available to capture — " + body.contentType + " · " + formatBytes(body.sizeBytes) + ".");
+  if (body.kind === "multipart") {
+    return el("div", { style: { background: "var(--bg3)", borderRadius: "var(--r-md)", padding: "8px", margin: "8px 0" } },
+      body.parts.map((p) => el("div.x-partrow", null,
+        el("div.x-partmeta", null, (p.name ? p.name + " · " : "") + p.contentType + " · " + formatBytes(p.sizeBytes)),
+        p.text ? el("pre.x-payload", { style: { maxHeight: "220px" } }, looksLikeJson(p.text) ? prettyJsonText(p.text) : p.text)
+          : el("div.x-hint", null, p.omittedReason ? "Not captured — " + p.omittedReason + "." : "No content."))));
+  }
+  return null;
+}
+function truncNote(t) {
+  if (!t) return null;
+  return el("div.x-redacted", null, "Truncated — kept " + formatBytes(t.keptBytes) + " of " + formatBytes(t.totalBytes) + ".");
+}
+
+function bodySection(rowId, id, title, body, contentType) {
+  const open = sectionOpen(rowId, id, true, bodySearchable(body));
+  const out = [collapsibleTitle(rowId, id, title, open, true, bodyTypeMeta(body, contentType))];
+  if (open) out.push(renderBodyContent(body, contentType));
+  return out;
+}
+
+/* ── Panel shell ─────────────────────────────────────────────────────────── */
+
+function renderDetailPanel() {
+  const row = selectedRow();
+  if (!row || row.kind === "marker" || row.kind === "run-boundary") return null;
+
+  const panel = el("div.x-detail", { style: { width: state.detailWidth + "px" } },
+    el("div.x-detailresize", { onpointerdown: startDetailResize }),
+    renderDetailHeader(row.kind === "network" ? "Network request" : "Details"),
+    row.kind === "network" ? renderNetworkBody(row) : renderLogBody(row));
+
+  requestAnimationFrame(applyDetailFind);
+  return panel;
+}
+
+function renderDetailHeader(title) {
+  const f = state.detailFind;
+  if (!f.open) {
+    return el("div.x-detailhdr", null,
+      el("span.x-detailtitle", null, title),
+      el("div.x-detailactions", null,
+        fbtn({ size: "sm", appearance: "subtle", icon: ICON.search, tip: "Find in this row (Ctrl+F)", onclick: () => { state.detailFind = { open: true, text: "", index: 0 }; renderAll(); } }),
+        fbtn({ size: "sm", appearance: "subtle", icon: ICON.dismiss, tip: "Close details", onclick: () => { state.selectedEventId = undefined; renderAll(); } })));
+  }
+  return el("div.x-detailhdr", null,
+    finput({
+      key: "detail-find", value: f.text, placeholder: "Find in this row…", className: "x-findinput",
+      style: { flex: "1", minWidth: "0" },
+      oninput: (v) => { state.detailFind.text = v; state.detailFind.index = 0; renderAll(); },
+      onkeydown: (e) => {
+        if (e.key === "Enter") { e.preventDefault(); stepDetailFind(e.shiftKey ? -1 : 1); }
+        if (e.key === "Escape") { e.preventDefault(); state.detailFind = { open: false, text: "", index: 0 }; renderAll(); }
+      },
+    }),
+    el("span.x-findcount#detail-find-count", null, "0 / 0"),
+    el("div.x-detailactions", null,
+      fbtn({ size: "sm", appearance: "subtle", icon: ICON.chevUp, tip: "Previous match (Shift+Enter)", onclick: () => stepDetailFind(-1) }),
+      fbtn({ size: "sm", appearance: "subtle", icon: ICON.chevDown, tip: "Next match (Enter)", onclick: () => stepDetailFind(1) }),
+      fbtn({ size: "sm", appearance: "subtle", icon: ICON.dismiss, tip: "Close find (Esc)", onclick: () => { state.detailFind = { open: false, text: "", index: 0 }; renderAll(); } })));
+}
+
+function startDetailResize(e) {
+  e.preventDefault();
+  const handle = e.currentTarget;
+  handle.classList.add("dragging");
+  const panel = handle.parentElement;
+  const startX = e.clientX;
+  const startW = state.detailWidth;
+  const move = (ev) => {
+    // The handle is on the LEFT edge: moving left widens the panel.
+    state.detailWidth = Math.max(DETAIL_MIN, Math.min(DETAIL_MAX, startW - (ev.clientX - startX)));
+    panel.style.width = state.detailWidth + "px";
+    renderRowsOnly();
+  };
+  const up = () => {
+    document.removeEventListener("pointermove", move);
+    document.removeEventListener("pointerup", up);
+    handle.classList.remove("dragging");
+    renderAll();
+  };
+  document.addEventListener("pointermove", move);
+  document.addEventListener("pointerup", up);
+}
+
+/* ── Log row ─────────────────────────────────────────────────────────────── */
+
+function renderLogBody(row) {
+  const lvl = levelStyle(row.levelName);
+  const f = detectMessageFormat(row.message);
+  const pretty = f.kind === "plain" ? row.message : prettyJson(f.value);
+
+  return el("div.x-detailbody", null,
+    el("div.x-field", null,
+      el("span.x-label", null, "Time"), copyable(formatDateTime(row.timestamp), undefined, "x-value"),
+      el("span.x-label", null, "Level"),
+      el("span", null, pill(lvl, lvl.label), " ", el("span.x-value", null, "(" + row.levelName + ", code " + row.level + ")")),
+      el("span.x-label", null, "Tag"),
+      el("span.x-value", null,
+        row.eventTag ? [copyable(row.eventTag), " · "] : null,
+        copyable(row.eventIdHex), " ",
+        el("span", { style: { color: "var(--fg4)" } }, "· " + row.eventIdDec)),
+      el("span.x-label", null, "Category"), copyable(row.category + " · " + row.categoryName, undefined, "x-value"),
+      el("span.x-label", null, "Log type"), copyable(row.logType === 0 ? "Trace" : row.logType === 1 ? "Assert" : String(row.logType), undefined, "x-value"),
+      el("span.x-label", null, "Source"), copyable(row.source || "—", undefined, "x-value"),
+      el("span.x-label", null, "Session"), copyable(row.sessionId, undefined, "x-value"),
+      el("span.x-label", null, "Upload Id"), copyable(String(row.uploadId), undefined, "x-value"),
+      el("span.x-label", null, "Endpoint"), copyable(row.endpoint, undefined, "x-value"),
+      row.correlationId ? [el("span.x-label", null, "Correlation"), copyable(row.correlationId, undefined, "x-value")] : null,
+      el("span.x-label", null, "Origin"), copyable(row.origin === "live" ? "Live capture" : "HAR file", undefined, "x-value")),
+
+    el("div.x-muterow", null,
+      fbtn({
+        size: "sm", appearance: "subtle", icon: ICON.eyeOff, label: "Mute tag",
+        tip: "Hide all events with tag " + (row.eventTag || row.eventIdHex),
+        onclick: () => addMuteRule({ kind: "tag", value: row.eventTag || row.eventIdHex }),
+      }),
+      fbtn({
+        size: "sm", appearance: "subtle", icon: ICON.eyeOff, label: "Mute message",
+        tip: "Hide events whose message matches this one",
+        onclick: () => addMuteRule({ kind: "regex", value: escapeRegex(row.message) }),
+      })),
+
+    el("hr.f-divider"),
+
+    el("div.x-sectiontitle", null, el("span", null, "Message " + messageSectionLabel(f))),
+    f.kind === "prefix-json" ? el("div", { style: { fontSize: "11px", color: "var(--fg3)", marginBottom: "4px", fontFamily: "var(--mono)" } }, f.prefix) : null,
+    payloadBlock(pretty),
+
+    f.kind !== "plain" ? [
+      el("div.x-sectiontitle", null, el("span", null, "Raw message string")),
+      payloadBlock(row.message),
+    ] : null);
+}
+
+/* ── Network row ─────────────────────────────────────────────────────────── */
+
+function renderNetworkBody(row) {
+  const st = statusStyle(row.status);
+  const reqCt = row.requestHeaders["content-type"] || "";
+
+  return el("div.x-detailbody", null,
+    row.fault ? el("div.x-chaosbanner", null,
+      el("span.x-chaostitle", null, "⚡ Chaos"),
+      el("span.x-chaosnote", null, row.fault.note),
+      row.fault.blocked
+        ? el("span.x-chaosnote", null, "Request was blocked before upstream — the client received this authored response; nothing was sent to the server.")
+        : row.fault.sentUrl
+          ? el("span.x-chaosnote", null, "Forwarded upstream to a different address: " + row.fault.sentUrl)
+          : null,
+      row.fault.original
+        ? el("span.x-chaosnote", null, "You’re seeing what the client received. The real upstream response is below, under “Original upstream response”.")
+        : null) : null,
+
+    el("div.x-field", null,
+      el("span.x-label", null, "Status"),
+      el("span", null, pill(st, statusLabel(row.status)), " ", el("span.x-value", null, row.statusText)),
+      el("span.x-label", null, "Class"), copyable(row.netClass, undefined, "x-value"),
+      el("span.x-label", null, "Method"), copyable(row.method, undefined, "x-value"),
+      el("span.x-label", null, "Time"), copyable(formatDateTime(row.timestamp), undefined, "x-value"),
+      el("span.x-label", null, "Duration"), copyable(row.durationMs + " ms", undefined, "x-value"),
+      el("span.x-label", null, "Size"), copyable(formatBytes(row.contentLength), undefined, "x-value"),
+      el("span.x-label", null, "Type"), copyable(row.contentType || "—", undefined, "x-value"),
+      row.sessionId ? [el("span.x-label", null, "Session"), copyable(row.sessionId, undefined, "x-value")] : null,
+      el("span.x-label", null, "Host"), copyable(row.hostname, undefined, "x-value")),
+
+    el("div.x-sectiontitle", null, el("span", null, "URL")),
+    el("div.x-urlvalue", null, copyable(row.url, row.url)),
+
+    headerSection(row.id, "req-headers", "Request headers", row.requestHeaders, row.redactedRequestHeaders),
+    row.requestBody.kind !== "empty" ? bodySection(row.id, "req-body", "Request body", row.requestBody, reqCt) : null,
+    headerSection(row.id, "res-headers", "Response headers", row.responseHeaders, row.redactedResponseHeaders),
+    bodySection(row.id, "res-body", "Response body", row.body, row.contentType),
+
+    row.fault && row.fault.original ? renderFaultOriginal(row) : null);
+}
+
+function renderFaultOriginal(row) {
+  const o = row.fault.original;
+  const open = sectionOpen(row.id, "orig", false, bodySearchable(o.body));
+  const st = statusStyle(o.status);
+  return [
+    el("hr.f-divider"),
+    collapsibleTitle(row.id, "orig", "Original upstream response", open, false, "before chaos"),
+    open ? el("div", null,
+      el("div.x-field", { style: { marginTop: "6px" } },
+        el("span.x-label", null, "Status"),
+        el("span", null, pill(st, statusLabel(o.status)), " ", el("span.x-value", null, o.statusText)),
+        el("span.x-label", null, "Size"), copyable(formatBytes(o.contentLength), undefined, "x-value"),
+        el("span.x-label", null, "Type"), copyable(o.contentType || "—", undefined, "x-value")),
+      headerSection(row.id, "orig-headers", "Upstream response headers", o.responseHeaders, o.redactedResponseHeaders),
+      bodySection(row.id, "orig-body", "Upstream response body", o.body, o.contentType)) : null,
+  ];
+}
+
+/* ── In-panel find: highlight text-node matches after render ─────────────── */
+
+function stepDetailFind(dir) {
+  const total = state.detailFind.count || 0;
+  if (!total) return;
+  let i = state.detailFind.index + dir;
+  if (i < 0) i = total - 1;
+  if (i >= total) i = 0;
+  state.detailFind.index = i;
+  applyDetailFind();
+}
+
+function applyDetailFind() {
+  const body = document.querySelector(".x-detailbody");
+  const countEl = document.getElementById("detail-find-count");
+  if (!body) return;
+
+  body.querySelectorAll("mark.x-findhit").forEach((m) => {
+    const t = document.createTextNode(m.textContent);
+    m.replaceWith(t);
+  });
+  body.normalize();
+
+  const q = state.detailFind.open ? state.detailFind.text.trim() : "";
+  if (!q) {
+    state.detailFind.count = 0;
+    if (countEl) countEl.textContent = "0 / 0";
+    return;
+  }
+
+  const lower = q.toLowerCase();
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => (n.nodeValue && n.nodeValue.toLowerCase().includes(lower) && n.parentElement && n.parentElement.offsetParent !== null)
+      ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT,
+  });
+  const targets = [];
+  let n;
+  while ((n = walker.nextNode())) targets.push(n);
+
+  const marks = [];
+  for (const node of targets) {
+    const text = node.nodeValue;
+    const frag = document.createDocumentFragment();
+    let i = 0;
+    for (;;) {
+      const at = text.toLowerCase().indexOf(lower, i);
+      if (at < 0) { frag.appendChild(document.createTextNode(text.slice(i))); break; }
+      if (at > i) frag.appendChild(document.createTextNode(text.slice(i, at)));
+      const mk = el("mark.x-findhit", null, text.slice(at, at + q.length));
+      frag.appendChild(mk);
+      marks.push(mk);
+      i = at + q.length;
+    }
+    node.replaceWith(frag);
+  }
+
+  state.detailFind.count = marks.length;
+  if (state.detailFind.index >= marks.length) state.detailFind.index = 0;
+  if (countEl) countEl.textContent = marks.length ? (state.detailFind.index + 1) + " / " + marks.length : "0 / 0";
+  const active = marks[state.detailFind.index];
+  if (active) {
+    active.classList.add("active");
+    active.scrollIntoView({ block: "center" });
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOTTOM DOCK — tabs, table scrollbar, status bar
+   ═════════════════════════════════════════════════════════════════════════ */
+
+state.zoom = 1;
+
+function dataRowCount(doc) { return doc ? doc.rows.reduce((n, r) => n + (isDataRow(r) ? 1 : 0), 0) : 0; }
+function shownDataCount() { return visibleRows().reduce((n, r) => n + (isDataRow(r) ? 1 : 0), 0); }
+
+function renderDock() {
+  const doc = activeDoc();
+  const cap = state.capture;
+  const live = liveDoc();
+  const viewingLive = live && live.id === state.activeDocumentId;
+  const total = dataRowCount(doc);
+  const shown = shownDataCount();
+  const narrowed = total > 0 && shown < total;
+  const runCount = doc ? doc.runs.length : 0;
+
+  const dotClass = cap.status === "running" ? "running"
+    : cap.status === "error" ? "error"
+    : cap.status === "starting" || cap.status === "stopping" ? "transitioning"
+    : "idle";
+  const label = cap.status === "running" ? "Capturing"
+    : cap.status === "starting" ? "Starting…"
+    : cap.status === "stopping" ? "Stopping…"
+    : cap.status === "error" ? "Error"
+    : "Idle";
+
+  const zoomPct = Math.round(state.zoom * 100);
+
+  return el("div.x-dock", null,
+    el("div.x-docrow", null,
+      el("div.x-docrail", null, renderTabStrip(), renderDockScrollbar()),
+      state.selectedEventId && selectedRow()
+        ? el("div.x-detailspacer", { style: { width: state.detailWidth + "px" }, "aria-hidden": "true" })
+        : null),
+
+    el("div.x-status", null,
+      el("div.x-statusleft", null,
+        el("span.x-statuspill", null, el("span", { class: "x-dot " + dotClass }), label),
+        live && !viewingLive
+          ? el("button.x-statusbtn", {
+              type: "button", title: "Show the live capture",
+              onclick: () => { state.activeDocumentId = live.id; state.selectedEventId = undefined; renderAll(); },
+            }, "View " + live.title)
+          : null,
+        cap.proxyPort ? el("span.x-secondary", null, "Proxy on 127.0.0.1:" + cap.proxyPort) : null,
+        cap.errorMessage ? el("span.x-statuserror", { title: cap.errorMessage }, cap.errorMessage) : null),
+
+      el("div.x-statusright", null,
+        zoomPct !== 100
+          ? el("button.x-statusbtn", {
+              type: "button", title: "UI zoom " + zoomPct + "% — click to reset (Ctrl+0)",
+              onclick: () => setZoom(1),
+            }, zoomPct + "%")
+          : null,
+        el("span", null,
+          (narrowed ? shown.toLocaleString() + " / " + total.toLocaleString() + " rows" : total.toLocaleString() + " rows")
+          + " · " + runCount.toLocaleString() + " " + (runCount === 1 ? "run" : "runs")),
+        cap.droppedCount > 0 ? el("span.x-warnbadge", null, cap.droppedCount + " dropped") : null)));
+}
+
+function renderDockScrollbar() {
+  const s = tableEls.scroller;
+  const max = s ? s.scrollWidth - s.clientWidth : 0;
+  if (!s || max <= 1) { dockBar = null; return null; }
+
+  const thumb = el("div.x-hbar-thumb");
+  const track = el("div.x-hbar", {
+    tabindex: "0", role: "scrollbar", "aria-label": "Log table horizontal scroll",
+    "aria-orientation": "horizontal",
+    onpointerdown: (e) => {
+      const t = tableEls.scroller;
+      if (!t) return;
+      const trackRect = track.getBoundingClientRect();
+      const thumbRect = thumb.getBoundingClientRect();
+      const range = t.scrollWidth - t.clientWidth;
+      const travel = Math.max(1, trackRect.width - thumbRect.width);
+      // Clicking the bare track jumps the thumb's centre to the cursor first.
+      let grab = e.clientX - thumbRect.left;
+      if (e.target !== thumb) {
+        grab = thumbRect.width / 2;
+        t.scrollLeft = ((e.clientX - trackRect.left - grab) / travel) * range;
+      }
+      thumb.classList.add("dragging");
+      const move = (ev) => {
+        const x = ev.clientX - trackRect.left - grab;
+        t.scrollLeft = Math.max(0, Math.min(range, (x / travel) * range));
+      };
+      const up = () => {
+        document.removeEventListener("pointermove", move);
+        document.removeEventListener("pointerup", up);
+        thumb.classList.remove("dragging");
+      };
+      document.addEventListener("pointermove", move);
+      document.addEventListener("pointerup", up);
+    },
+    onkeydown: (e) => {
+      const t = tableEls.scroller;
+      if (!t) return;
+      const step = e.key === "Home" || e.key === "End" ? t.scrollWidth : 60;
+      if (e.key === "ArrowLeft") { e.preventDefault(); t.scrollLeft -= step; }
+      else if (e.key === "ArrowRight") { e.preventDefault(); t.scrollLeft += step; }
+      else if (e.key === "Home") { e.preventDefault(); t.scrollLeft = 0; }
+      else if (e.key === "End") { e.preventDefault(); t.scrollLeft = t.scrollWidth; }
+    },
+  }, thumb);
+
+  dockBar = { track, thumb };
+  requestAnimationFrame(syncDockScrollbar);
+  return el("div.x-hscrollslot", null, track);
+}
+
+/* ── Tab strip ───────────────────────────────────────────────────────────── */
+
+function selectDocument(id) {
+  if (state.activeDocumentId === id) return;
+  state.activeDocumentId = id;
+  state.selectedEventId = undefined;
+  state.spanZoom = false;
+  state.findActiveIndex = 0;
+  state.followingTail = true;
+  renderAll();
+}
+
+function closeDocument(id) {
+  const doc = docById(id);
+  if (!doc) return;
+  if (state.capture.liveDocumentId === id) { showToast("Stop the live capture first"); return; }
+  const i = state.documents.findIndex((d) => d.id === id);
+  state.documents = state.documents.filter((d) => d.id !== id);
+  if (!state.documents.length) createDocument("capture");
+  if (state.activeDocumentId === id) {
+    const next = state.documents[Math.min(i, state.documents.length - 1)];
+    state.activeDocumentId = next.id;
+    state.selectedEventId = undefined;
+  }
+  tableEls.docId = null;
+  renderAll();
+}
+
+/** Double-click tracking for tab rename (see the tab button's onclick). */
+let lastTabClick = { id: null, t: 0 };
+
+function renderTabStrip() {
+  const list = el("div.x-tablist");  for (const doc of state.documents) {
+    const active = doc.id === state.activeDocumentId;
+    const isLive = state.capture.liveDocumentId === doc.id;
+    const count = dataRowCount(doc);
+
+    if (state.tabRename && state.tabRename.id === doc.id) {
+      list.appendChild(el("div", { class: "x-tabshell" + (active ? " active" : "") },
+        el("div.x-renamewrap", null,
+          el("input.x-renameinput", {
+            "data-k": "tab-rename", value: state.tabRename.value,
+            oninput: (e) => { state.tabRename.value = e.target.value; },
+            onblur: () => commitRename(),
+            onkeydown: (e) => {
+              if (e.key === "Enter") { e.preventDefault(); commitRename(); }
+              if (e.key === "Escape") { e.preventDefault(); state.tabRename = undefined; renderAll(); }
+            },
+          }))));
+      continue;
+    }
+
+    const shell = el("div", { class: "x-tabshell" + (active ? " active" : "") },
+      el("button.x-tabbtn", {
+        type: "button", "data-tab": doc.id, tabindex: active ? "0" : "-1",
+        title: doc.title + " · " + count.toLocaleString() + " rows",
+        // Double-click is detected by timestamp rather than the dblclick event:
+        // selecting a tab re-renders the strip, so the second click would land on
+        // a brand-new node and dblclick would never fire.
+        onclick: () => {
+          const now = Date.now();
+          if (lastTabClick.id === doc.id && now - lastTabClick.t < 450) {
+            lastTabClick = { id: null, t: 0 };
+            beginRename(doc.id);
+            return;
+          }
+          lastTabClick = { id: doc.id, t: now };
+          selectDocument(doc.id);
+        },
+        onauxclick: (e) => { if (e.button === 1) { e.preventDefault(); closeDocument(doc.id); } },
+        oncontextmenu: (e) => { e.preventDefault(); openOverlay("tabmenu", { left: e.clientX, right: e.clientX, top: e.clientY, bottom: e.clientY, width: 0, height: 0 }, { docId: doc.id, align: "start" }); },
+        onkeydown: (e) => onTabKey(e, doc),
+      },
+        el("span", {
+          class: "x-tabicon" + (isLive ? " live" : "") + (doc.status === "error" ? " err" : ""),
+          html: doc.kind === "har" ? ICON.doc : ICON.record,
+        }),
+        el("span.x-tabtitle", null, doc.title),
+        count ? el("span.x-tabcount", null, count.toLocaleString()) : null));
+    list.appendChild(shell);
+  }
+
+  return el("div.x-tabstrip", null,
+    el("div.x-tabviewport", null, list),
+    attachTip(el("button", {
+      class: "f-btn subtle icon-only x-tabadd", type: "button", "aria-label": "New capture tab",
+      html: ICON.addSm,
+      onclick: () => { const d = createDocument("capture"); selectDocument(d.id); },
+    }), "New capture tab"));
+}
+
+function beginRename(id) {
+  const doc = docById(id);
+  if (!doc) return;
+  state.tabRename = { id, value: doc.title };
+  renderAll();
+  requestAnimationFrame(() => {
+    const input = document.querySelector('[data-k="tab-rename"]');
+    if (input) { input.focus(); input.select(); }
+  });
+}
+function commitRename() {
+  const r = state.tabRename;
+  if (!r) return;
+  const doc = docById(r.id);
+  state.tabRename = undefined;
+  if (doc) {
+    const v = r.value.trim();
+    if (v) { doc.title = v; doc.autoTitle = false; }
+    else if (doc.autoNumber) { doc.title = "Capture " + doc.autoNumber; doc.autoTitle = true; }
+  }
+  renderAll();
+}
+
+function onTabKey(e, doc) {
+  const i = state.documents.findIndex((d) => d.id === doc.id);
+  const focusTab = (idx) => {
+    const t = state.documents[idx];
+    if (!t) return;
+    selectDocument(t.id);
+    requestAnimationFrame(() => {
+      const b = document.querySelector('[data-tab="' + t.id + '"]');
+      if (b) b.focus();
+    });
+  };
+  if (e.key === "ArrowRight") { e.preventDefault(); focusTab(Math.min(i + 1, state.documents.length - 1)); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); focusTab(Math.max(i - 1, 0)); }
+  else if (e.key === "Home") { e.preventDefault(); focusTab(0); }
+  else if (e.key === "End") { e.preventDefault(); focusTab(state.documents.length - 1); }
+  else if (e.key === "F2") { e.preventDefault(); beginRename(doc.id); }
+  else if (e.key === "Delete") { e.preventDefault(); closeDocument(doc.id); }
+  else if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+    e.preventDefault();
+    const r = e.currentTarget.getBoundingClientRect();
+    openOverlay("tabmenu", r, { docId: doc.id, align: "start" });
+  }
+}
+
+OVERLAYS.tabmenu = (o) => {
+  const id = o.docId;
+  const i = state.documents.findIndex((d) => d.id === id);
+  const m = el("div.x-menu");
+  m.appendChild(menuItem("Rename…", () => { closeOverlay(); beginRename(id); }));
+  m.appendChild(el("div.x-menudivider"));
+  m.appendChild(menuItem("Close", () => { closeOverlay(); closeDocument(id); }));
+  m.appendChild(menuItem("Close others", () => {
+    closeOverlay();
+    for (const d of state.documents.slice()) if (d.id !== id) closeDocument(d.id);
+  }, { disabled: state.documents.length < 2 }));
+  m.appendChild(menuItem("Close tabs to the right", () => {
+    closeOverlay();
+    for (const d of state.documents.slice(i + 1)) closeDocument(d.id);
+  }, { disabled: i >= state.documents.length - 1 }));
+  return m;
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ZOOM (emulates the Electron window zoom, for demoing on a big screen)
+   ═════════════════════════════════════════════════════════════════════════ */
+
+function setZoom(z) {
+  state.zoom = Math.max(0.5, Math.min(2.5, Math.round(z * 100) / 100));
+  document.documentElement.style.zoom = state.zoom === 1 ? "" : String(state.zoom);
+  renderAll();
+}
+function nudgeZoom(dir) { setZoom(state.zoom + dir * 0.1); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   KEYBOARD
+   ═════════════════════════════════════════════════════════════════════════ */
+
+function inTextField(t) {
+  if (!t) return false;
+  const tag = t.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t.isContentEditable;
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    if (state.overlay) { e.preventDefault(); closeOverlay(); return; }
+    if (state.detailFind.open) { e.preventDefault(); state.detailFind = { open: false, text: "", index: 0 }; renderAll(); return; }
+  }
+
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+    if (selectedRow()) { e.preventDefault(); state.detailFind = { open: true, text: state.detailFind.text || "", index: 0 }; renderAll();
+      requestAnimationFrame(() => { const i = document.querySelector('[data-k="detail-find"]'); if (i) i.focus(); }); }
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key === "+" || e.key === "=")) { e.preventDefault(); nudgeZoom(1); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key === "-") { e.preventDefault(); nudgeZoom(-1); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key === "0") { e.preventDefault(); setZoom(1); return; }
+
+  if (e.ctrlKey && e.key === "Tab") {
+    e.preventDefault();
+    const i = state.documents.findIndex((d) => d.id === state.activeDocumentId);
+    const n = state.documents.length;
+    selectDocument(state.documents[(i + (e.shiftKey ? -1 : 1) + n) % n].id);
+    return;
+  }
+  if (e.ctrlKey && /^[1-9]$/.test(e.key)) {
+    const d = state.documents[Number(e.key) - 1];
+    if (d) { e.preventDefault(); selectDocument(d.id); }
+    return;
+  }
+
+  if (inTextField(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+
+  if (e.key === "m" || e.key === "M") { e.preventDefault(); addMarker(); }
+  else if (e.key === "[") { e.preventDefault(); jumpMarker(-1); }
+  else if (e.key === "]") { e.preventDefault(); jumpMarker(1); }
+});
+
+window.addEventListener("wheel", (e) => {
+  if (!e.ctrlKey || e.deltaY === 0) return;
+  e.preventDefault();
+  nudgeZoom(e.deltaY < 0 ? 1 : -1);
+}, { passive: false });
+
+/* Reveal scrollbar thumbs only while a container is actively scrolling. */
+document.addEventListener("scroll", (e) => {
+  const t = e.target;
+  if (!t || t.nodeType !== 1 || !t.classList) return;
+  t.classList.add("is-scrolling");
+  clearTimeout(t._srt);
+  t._srt = setTimeout(() => t.classList.remove("is-scrolling"), 900);
+}, { capture: true, passive: true });
+
+window.addEventListener("resize", () => { hideTip(); renderAll(); });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INIT
+   ═════════════════════════════════════════════════════════════════════════ */
+
+(function init() {
+  const first = createDocument("capture");
+  state.activeDocumentId = first.id;
+  renderNow();
+
+  // Keep the windowed list correct as the viewport changes.
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => { if (tableEls.scroller) renderRowsOnly(); });
+    ro.observe(document.getElementById("region-body"));
+  }
+})();
+
+</script>
+</body>
+</html>
