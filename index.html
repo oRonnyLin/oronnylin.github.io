@@ -25,11 +25,11 @@
 	<link href="https://fonts.googleapis.com/css?family=Space+Mono" rel="stylesheet">
 	<link href="https://fonts.googleapis.com/css?family=Kaushan+Script" rel="stylesheet">
 
-	<link rel="stylesheet" href="css/animate.css?v=7">
-	<link rel="stylesheet" href="css/icomoon.css?v=7">
-	<link rel="stylesheet" href="css/bootstrap.css?v=7">
-	<link rel="stylesheet" href="css/style.css?v=7">
-	<link rel="stylesheet" href="css/custom.css?v=7">
+	<link rel="stylesheet" href="css/animate.css?v=8">
+	<link rel="stylesheet" href="css/icomoon.css?v=8">
+	<link rel="stylesheet" href="css/bootstrap.css?v=8">
+	<link rel="stylesheet" href="css/style.css?v=8">
+	<link rel="stylesheet" href="css/custom.css?v=8">
 
 	<script src="js/modernizr-2.6.2.min.js"></script>
 	<!--[if lt IE 9]>
@@ -52,7 +52,7 @@
 						<div class="display-tc js-fullheight hero-stage">
 							<div class="profile-thumb hero-reveal" style="background: url(images/profile.jpg);"></div>
 							<h1 class="hero-reveal"><span>Ronny Lin</span></h1>
-							<h3><span id="role-line">Full Stack Developer</span></h3>
+							<h3 class="hero-role"><span id="role-line">Full Stack Developer</span></h3>
 							<div class="fh5co-social-wrap hero-icons">
 								<ul class="fh5co-social-icons">
 									<li><a href="https://github.com/oRonnyLin" target="_blank" rel="noopener" title="GitHub"><i class="icon-github"></i></a></li>
@@ -473,10 +473,11 @@
 		if (stage && role && !reduced) {
 			stage.classList.add('hero-armed');
 			setTimeout(function () { stage.classList.add('hero-play'); }, 250);
-			var roles = ['Full Stack Developer', 'Photographer'];
+			var roles = ['Full Stack Developer', 'Amateur Photographer'];
 			setTimeout(function () {
-				role.classList.add('type-caret');
 				role.textContent = '';
+				role.classList.add('type-caret');
+				role.parentElement.classList.add('role-live');
 				var ri = 0, ci = 0, deleting = false, iconsIn = false, timer;
 				function tick() {
 					var word = roles[ri % roles.length];

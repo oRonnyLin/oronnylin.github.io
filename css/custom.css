@@ -484,6 +484,17 @@ a:focus-visible {
 	transform: translateY(14px);
 }
 
+/* The role line ships with its text for no-JS visitors; once JS arms the
+   stage it hides until the instant typing starts (when it is empty), so the
+   finished title never flashes before the typewriter runs. */
+.hero-armed .hero-role {
+	opacity: 0;
+}
+
+.hero-armed .hero-role.role-live {
+	opacity: 1;
+}
+
 .hero-play .hero-reveal {
 	animation: hero-rise .7s cubic-bezier(.2, .7, .3, 1) forwards;
 }
@@ -513,7 +524,8 @@ a:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
 	.hero-armed .hero-reveal,
-	.hero-armed .hero-icons {
+	.hero-armed .hero-icons,
+	.hero-armed .hero-role {
 		opacity: 1;
 		transform: none;
 		animation: none !important;
