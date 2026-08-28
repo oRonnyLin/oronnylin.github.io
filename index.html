@@ -25,11 +25,11 @@
 	<link href="https://fonts.googleapis.com/css?family=Space+Mono" rel="stylesheet">
 	<link href="https://fonts.googleapis.com/css?family=Kaushan+Script" rel="stylesheet">
 
-	<link rel="stylesheet" href="css/animate.css?v=6">
-	<link rel="stylesheet" href="css/icomoon.css?v=6">
-	<link rel="stylesheet" href="css/bootstrap.css?v=6">
-	<link rel="stylesheet" href="css/style.css?v=6">
-	<link rel="stylesheet" href="css/custom.css?v=6">
+	<link rel="stylesheet" href="css/animate.css?v=7">
+	<link rel="stylesheet" href="css/icomoon.css?v=7">
+	<link rel="stylesheet" href="css/bootstrap.css?v=7">
+	<link rel="stylesheet" href="css/style.css?v=7">
+	<link rel="stylesheet" href="css/custom.css?v=7">
 
 	<script src="js/modernizr-2.6.2.min.js"></script>
 	<!--[if lt IE 9]>
@@ -49,11 +49,11 @@
 			<div class="row">
 				<div class="col-md-8 col-md-offset-2 text-center">
 					<div class="display-t js-fullheight">
-						<div class="display-tc js-fullheight animate-box" data-animate-effect="fadeIn">
-							<div class="profile-thumb" style="background: url(images/profile.jpg);"></div>
-							<h1><span>Ronny Lin</span></h1>
-							<h3><span>Full Stack Developer</span></h3>
-							<div class="fh5co-social-wrap">
+						<div class="display-tc js-fullheight hero-stage">
+							<div class="profile-thumb hero-reveal" style="background: url(images/profile.jpg);"></div>
+							<h1 class="hero-reveal"><span>Ronny Lin</span></h1>
+							<h3><span id="role-line">Full Stack Developer</span></h3>
+							<div class="fh5co-social-wrap hero-icons">
 								<ul class="fh5co-social-icons">
 									<li><a href="https://github.com/oRonnyLin" target="_blank" rel="noopener" title="GitHub"><i class="icon-github"></i></a></li>
 									<li><a href="https://www.linkedin.com/in/ronnylin" target="_blank" rel="noopener" title="LinkedIn"><i class="icon-linkedin2"></i></a></li>
@@ -387,6 +387,7 @@
 				<div class="col-md-8 col-md-offset-2 text-center fh5co-heading">
 					<h2>Photography</h2>
 					<span class="wip">Nature, Street, Life</span>
+					<p>I like to take photos of nature and document events around me. These are some of the photos that I&rsquo;ve taken in Taiwan, Japan, and Canada.</p>
 				</div>
 			</div>
 			<div class="row animate-box">
@@ -450,6 +451,11 @@
 		<a href="#" class="js-gotop" aria-label="Back to top"><i class="icon-arrow-up22" aria-hidden="true"></i></a>
 	</div>
 
+	<div id="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer" hidden>
+		<button id="lightbox-close" type="button" aria-label="Close photo">&times;</button>
+		<img id="lightbox-img" src="" alt="">
+	</div>
+
 	<script src="js/jquery.min.js"></script>
 	<script src="js/jquery.easing.1.3.js"></script>
 	<script src="js/bootstrap.min.js"></script>
@@ -457,6 +463,78 @@
 	<script src="js/jquery.stellar.min.js"></script>
 	<script src="js/main.js"></script>
 	<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+	<script>
+	(function () {
+		var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+		/* --- hero: rise, type the role, then the icons --- */
+		var stage = document.querySelector('.hero-stage');
+		var role = document.getElementById('role-line');
+		if (stage && role && !reduced) {
+			stage.classList.add('hero-armed');
+			setTimeout(function () { stage.classList.add('hero-play'); }, 250);
+			var roles = ['Full Stack Developer', 'Photographer'];
+			setTimeout(function () {
+				role.classList.add('type-caret');
+				role.textContent = '';
+				var ri = 0, ci = 0, deleting = false, iconsIn = false, timer;
+				function tick() {
+					var word = roles[ri % roles.length];
+					if (deleting) {
+						role.textContent = word.slice(0, --ci);
+						if (ci === 0) { deleting = false; ri++; }
+					} else {
+						role.textContent = word.slice(0, ++ci);
+						if (ci === word.length) {
+							clearInterval(timer);
+							if (!iconsIn) { iconsIn = true; stage.classList.add('hero-icons-in'); }
+							if (ri < roles.length) {
+								setTimeout(function () { deleting = true; timer = setInterval(tick, 40); },
+									ri === roles.length - 1 ? 2000 : 1500);
+							} else {
+								setTimeout(function () { role.classList.remove('type-caret'); }, 1800);
+							}
+						}
+					}
+				}
+				timer = setInterval(tick, 70);
+			}, 950);
+		} else if (stage) {
+			stage.classList.add('hero-icons-in');
+		}
+
+		/* --- photo lightbox: fit to screen, keep aspect ratio --- */
+		var box = document.getElementById('lightbox');
+		var img = document.getElementById('lightbox-img');
+		var closeBtn = document.getElementById('lightbox-close');
+		var lastFocus = null;
+		function openBox(href, alt) {
+			img.src = href; img.alt = alt || '';
+			box.hidden = false;
+			document.body.style.overflow = 'hidden';
+			lastFocus = document.activeElement;
+			closeBtn.focus();
+		}
+		function closeBox() {
+			box.hidden = true; img.src = '';
+			document.body.style.overflow = '';
+			if (lastFocus) lastFocus.focus();
+		}
+		document.querySelectorAll('.photo-grid a').forEach(function (a) {
+			a.addEventListener('click', function (e) {
+				if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+				e.preventDefault();
+				var t = a.querySelector('img');
+				openBox(a.getAttribute('href'), t ? t.alt : '');
+			});
+		});
+		box.addEventListener('click', function (e) { if (e.target !== img) closeBox(); });
+		closeBtn.addEventListener('click', closeBox);
+		document.addEventListener('keydown', function (e) {
+			if (e.key === 'Escape' && !box.hidden) closeBox();
+		});
+	})();
+	</script>
 
 	</body>
 </html>

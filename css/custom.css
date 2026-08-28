@@ -470,3 +470,110 @@ a:focus-visible {
 	outline: 2px solid var(--ink) !important;
 	outline-offset: 2px;
 }
+
+/* --- Hero entrance ---------------------------------------------------------
+   Replaces the template's all-at-once .animate-box fade on the hero.
+   Sequence: photo + name rise -> role line types itself (inline script in
+   index.html) -> icons rise once the first word completes. .hero-armed is
+   added by JS before .hero-play, so with JS disabled (or reduced motion)
+   nothing is ever hidden. */
+
+.hero-armed .hero-reveal,
+.hero-armed .hero-icons {
+	opacity: 0;
+	transform: translateY(14px);
+}
+
+.hero-play .hero-reveal {
+	animation: hero-rise .7s cubic-bezier(.2, .7, .3, 1) forwards;
+}
+
+.hero-play.hero-icons-in .hero-icons {
+	animation: hero-rise .7s cubic-bezier(.2, .7, .3, 1) forwards;
+}
+
+@keyframes hero-rise {
+	to { opacity: 1; transform: translateY(0); }
+}
+
+.type-caret::after {
+	content: "\258A";
+	margin-left: 2px;
+	animation: caret-blink 1s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+	50% { opacity: 0; }
+}
+
+/* Role line needs a stable height while empty during typing. */
+#fh5co-header .display-tc h3 {
+	min-height: 1.6em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.hero-armed .hero-reveal,
+	.hero-armed .hero-icons {
+		opacity: 1;
+		transform: none;
+		animation: none !important;
+	}
+}
+
+/* --- Photography tagline (white section; the template's #828282 is 3.84:1) */
+
+#fh5co-photos .fh5co-heading p {
+	color: var(--ink-muted);
+	max-width: 620px;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+/* --- Photo lightbox --------------------------------------------------------
+   Opening the raw file made the browser show it 1:1 and forced scrolling.
+   This fits the photo to the viewport, aspect ratio intact. */
+
+#lightbox {
+	position: fixed;
+	inset: 0;
+	z-index: 10000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(16, 24, 22, .94);
+	cursor: zoom-out;
+}
+
+#lightbox[hidden] {
+	display: none;
+}
+
+#lightbox img {
+	max-width: 92vw;
+	max-height: 92vh;
+	object-fit: contain;
+	border-radius: 2px;
+	cursor: default;
+}
+
+#lightbox-close {
+	position: absolute;
+	top: 14px;
+	right: 18px;
+	width: 44px;
+	height: 44px;
+	border: 0;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, .12);
+	color: #fff;
+	font-size: 26px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+#lightbox-close:hover,
+#lightbox-close:focus-visible {
+	background: var(--accent);
+	outline: 2px solid #fff;
+	outline-offset: 2px;
+}
