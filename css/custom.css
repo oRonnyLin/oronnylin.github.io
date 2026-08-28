@@ -310,39 +310,8 @@ a.work:focus-visible .desc span {
    text on top. They are now a pastel wash, so every one of those white values
    has to become ink or it disappears. --------------------------------------- */
 
-#fh5co-features h2,
-#fh5co-features .feature-left h3,
-.fh5co-bg-dark .fh5co-heading h2,
-#fh5co-started .fh5co-heading h2 {
+.fh5co-bg-dark .fh5co-heading h2 {
 	color: var(--ink) !important;
-}
-
-#fh5co-features .feature-left p,
-#fh5co-started .fh5co-heading p {
-	color: var(--ink-muted);
-}
-
-#fh5co-features .feature-left p a {
-	color: var(--accent) !important;
-}
-
-/* The CTA button was white-on-orange; on a pastel wash it needs to be the
-   solid element instead. */
-#fh5co-started .btn {
-	background: var(--accent) !important;
-	color: #fff !important;
-}
-
-#fh5co-started .btn:hover,
-#fh5co-started .btn:focus {
-	background: var(--accent-hover) !important;
-	color: #fff !important;
-}
-
-/* The CTA section paints a dark overlay meant for a photo background; with a
-   flat wash underneath it just muddies the colour. */
-#fh5co-started .overlay {
-	display: none;
 }
 
 
@@ -411,17 +380,6 @@ a.work:focus-visible .desc span {
 	}
 }
 
-
-/* --- What I Do tiles: kill the template's shrink-wrap float ----------------
-   style.css:233 floats each .feature-left with no width, so in the stacked
-   single-column layout a tile shrinks to its text width and hugs the left
-   edge -- visible on the shortest tile (Live-Site Reliability). The float
-   does nothing useful at any width. */
-
-#fh5co-features .feature-left {
-	float: none;
-	width: 100%;
-}
 
 
 /* --- Contact-side panel: bottom-anchored window onto the cover photo -------
