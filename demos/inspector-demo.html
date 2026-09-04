@@ -581,6 +581,18 @@ input, select, textarea { font-family: inherit; }
 .x-kindbtn.keep { background: var(--bg3); color: var(--fg3); }
 .x-kindbtn.keep:hover { background: var(--bg3); }
 .x-legseg { width: 58px; box-sizing: border-box; flex-shrink: 0; }
+/* The three content-filter scopes share one width so url / header / body read as
+   an aligned set rather than three differently-sized chips. */
+.x-scopeseg { width: 52px; box-sizing: border-box; flex-shrink: 0; }
+/* The `!` negate toggle lives INSIDE the filter box, so the row reads as one
+   sentence: "filter by ! <value> in url header body". */
+.x-negbtn {
+  width: 18px; height: 18px; padding: 0; margin-right: 2px; flex-shrink: 0;
+  border-radius: var(--r-sm); font-weight: 700; line-height: 1;
+}
+.x-negbtn.active { background: var(--brandBg2); color: var(--brandFg1); }
+.x-negbtn.active:hover { background: var(--brandBg2); }
+.x-urlreveal.open { max-height: 64px; opacity: 1; padding-top: 6px; }
 /* Label sized to its BOLD width so selecting an option can never resize the button. */
 .x-reserve { display: inline-grid; justify-items: center; }
 .x-reserve > span { grid-area: 1 / 1; }
@@ -622,10 +634,10 @@ input, select, textarea { font-family: inherit; }
 /* Mute panel */
 .x-mute { display: flex; flex-direction: column; gap: 8px; min-width: 300px; max-width: 380px; }
 .x-mutetitle { font-size: 12px; font-weight: 600; }
-.x-muteempty { font-size: 11.5px; color: var(--fg3); line-height: 1.4; }
+.x-mutescope { font-size: 11px; color: var(--fg3); line-height: 1.4; }
 .x-mutelist { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto; }
 .x-muterow2 { display: flex; align-items: center; gap: 6px; }
-.x-mutekind { font-size: 10px; text-transform: uppercase; letter-spacing: .3px; color: var(--fg3); font-weight: 600; flex-shrink: 0; width: 38px; }
+.x-mutekind { font-size: 10px; text-transform: uppercase; letter-spacing: .3px; color: var(--fg3); font-weight: 600; flex-shrink: 0; width: 58px; }
 .x-muteval { font-family: var(--mono); font-size: 11px; color: var(--fg1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
 .x-muteactions { display: flex; justify-content: space-between; gap: 6px; }
 
@@ -815,8 +827,18 @@ function pill(style, label) {
 
 const LOG_ENDPOINT = "https://liveapp.contoso.com/telemetry/RemoteLogs.ashx";
 
-/** The six built-in network classes the demo ships with. */
-const BUILTIN_CLASSES = ["Thumbnail", "Session", "Items", "Asset", "Media", "Embed"];
+/** The built-in network classes the demo ships with. */
+const BUILTIN_CLASSES = ["Thumbnail", "Session", "Items", "Asset", "Media", "Embed", "Embed assets", "Contoso Calling"];
+
+/**
+ * The Category shown for a row that records a TLS connection to a host we do NOT
+ * decrypt (the `showUndecryptedHosts` discovery aid). Deliberately not a member of
+ * BUILTIN_CLASSES — those are URL classifiers that double as chaos targets, and a
+ * connection we never decrypt has no URL and cannot be faulted. Reserved against
+ * custom Record labels instead, so the Category column can't show two shapes under
+ * one name.
+ */
+const UNDECRYPTED_CLASS = "Undecrypted";
 
 const BUILTIN_CLASS_INFO = {
   Thumbnail: "liveapp · /GetThumbnailUrl.ashx",
@@ -825,6 +847,8 @@ const BUILTIN_CLASS_INFO = {
   Asset: "res-*.cdn.contoso.net · /live/… — JS / CSS / image (size only)",
   Media: "video/audio — *-media.contoso.io/transform/…",
   Embed: "Drive · /embed.aspx — embed host page",
+  "Embed assets": "res-*.cdn.contoso.net · /files/…/embed-bundle — embed player bundle",
+  "Contoso Calling": "calling.contoso.com (+ subdomains) — every request",
 };
 
 /** Seeded hosts the demo proxy would decrypt. Fictional. */
@@ -833,7 +857,170 @@ const BUILTIN_HOSTS = [
   { id: "cdn", label: "Static CDN — assets", hostnames: ["res-*.cdn.contoso.net", "res.cdn.contoso.net"], enabled: true, builtin: true },
   { id: "media", label: "Media — video / audio transcode", hostnames: ["*-media.contoso.io", "media.contoso.io"], enabled: true, builtin: true },
   { id: "drive", label: "Drive / Storage", hostnames: ["*.contoso-drive.com", "*.contoso-drive-df.com"], enabled: true, builtin: true },
+  { id: "calling", label: "Contoso Calling", hostnames: ["calling.contoso.com", "*.calling.contoso.com"], enabled: true, builtin: true },
 ];
+
+/** Hosts a capture sees but never decrypts — the discovery rows' source. */
+const UNDECRYPTED_HOSTS = [
+  "telemetry.contoso-analytics.com",
+  "cdn.thirdparty-fonts.net",
+  "push.contoso-notify.com",
+  "beacon.adtech-example.net",
+  "ocsp.digicert-example.com",
+  "settings.contoso-cloud.com",
+];
+
+/**
+ * Automatic titles for capture tabs: `<emoji> <Animal>`, ported from the app's
+ * capture-title.ts. The animal is a specific breed or species rather than its
+ * category — `Labrador`, not `Dog` — so several entries share an emoji: the glyph
+ * reads as the family and the word carries the identity. Emoji are single code
+ * points (a ZWJ sequence that fails to ligate would double the tab's leading
+ * width) and names are capped at 11 characters to fit the 180px tab cap.
+ */
+const CAPTURE_ANIMALS = [
+  ["🐕", "Labrador"],
+  ["🐕", "Beagle"],
+  ["🐕", "Husky"],
+  ["🐕", "Collie"],
+  ["🐕", "Corgi"],
+  ["🐕", "Mastiff"],
+  ["🐕", "Whippet"],
+  ["🐕", "Spaniel"],
+  ["🐩", "Poodle"],
+  ["🐈", "Siamese"],
+  ["🐈", "Bengal"],
+  ["🐈", "Persian"],
+  ["🐈", "Ragdoll"],
+  ["🐈", "Manx"],
+  ["🐈", "Birman"],
+  ["🐆", "Lynx"],
+  ["🐆", "Ocelot"],
+  ["🐆", "Serval"],
+  ["🐆", "Caracal"],
+  ["🐆", "Cheetah"],
+  ["🐅", "Sumatran"],
+  ["🐅", "Amur"],
+  ["🐎", "Mustang"],
+  ["🐎", "Arabian"],
+  ["🐎", "Palomino"],
+  ["🐎", "Appaloosa"],
+  ["🐎", "Shire"],
+  ["🫏", "Donkey"],
+  ["🦓", "Zebra"],
+  ["🐄", "Hereford"],
+  ["🐄", "Angus"],
+  ["🐄", "Jersey"],
+  ["🐃", "Brahman"],
+  ["🐂", "Ox"],
+  ["🦬", "Bison"],
+  ["🐑", "Merino"],
+  ["🐏", "Dorset"],
+  ["🐐", "Nubian"],
+  ["🐖", "Berkshire"],
+  ["🐖", "Tamworth"],
+  ["🐗", "Boar"],
+  ["🐪", "Dromedary"],
+  ["🐫", "Bactrian"],
+  ["🦙", "Llama"],
+  ["🦙", "Alpaca"],
+  ["🦌", "Roe Deer"],
+  ["🦌", "Red Deer"],
+  ["🦌", "Caribou"],
+  ["🦌", "Elk"],
+  ["🫎", "Moose"],
+  ["🦒", "Giraffe"],
+  ["🐘", "Elephant"],
+  ["🦏", "White Rhino"],
+  ["🦛", "Hippo"],
+  ["🦣", "Mammoth"],
+  ["🦊", "Fennec"],
+  ["🐺", "Grey Wolf"],
+  ["🐺", "Timber Wolf"],
+  ["🦡", "Badger"],
+  ["🦔", "Hedgehog"],
+  ["🦫", "Beaver"],
+  ["🦨", "Skunk"],
+  ["🦥", "Sloth"],
+  ["🦘", "Wallaby"],
+  ["🐇", "Lop"],
+  ["🐇", "Angora"],
+  ["🐹", "Syrian"],
+  ["🐁", "Dormouse"],
+  ["🦇", "Fruit Bat"],
+  ["🐻", "Grizzly"],
+  ["🐻", "Kodiak"],
+  ["🐨", "Koala"],
+  ["🐼", "Panda"],
+  ["🦍", "Silverback"],
+  ["🐒", "Macaque"],
+  ["🐒", "Capuchin"],
+  ["🦅", "Peregrine"],
+  ["🦅", "Kestrel"],
+  ["🦅", "Osprey"],
+  ["🦅", "Goshawk"],
+  ["🦉", "Barn Owl"],
+  ["🦉", "Tawny Owl"],
+  ["🦉", "Snowy Owl"],
+  ["🦆", "Mallard"],
+  ["🦆", "Pintail"],
+  ["🦆", "Wigeon"],
+  ["🦢", "Trumpeter"],
+  ["🦢", "Whooper"],
+  ["🪿", "Greylag"],
+  ["🦜", "Macaw"],
+  ["🦜", "Cockatoo"],
+  ["🦜", "Cockatiel"],
+  ["🦚", "Peacock"],
+  ["🐧", "Emperor"],
+  ["🐧", "Gentoo"],
+  ["🐧", "Rockhopper"],
+  ["🦃", "Turkey"],
+  ["🐓", "Leghorn"],
+  ["🐓", "Sussex"],
+  ["🐦", "Robin"],
+  ["🐦", "Finch"],
+  ["🐦", "Starling"],
+  ["🦤", "Dodo"],
+  ["🦩", "Flamingo"],
+  ["🐋", "Beluga"],
+  ["🐋", "Narwhal"],
+  ["🐋", "Orca"],
+  ["🐋", "Humpback"],
+  ["🐬", "Bottlenose"],
+  ["🦭", "Harp Seal"],
+  ["🦦", "Sea Otter"],
+  ["🦈", "Hammerhead"],
+  ["🦈", "Great White"],
+  ["🦈", "Basking"],
+  ["🐟", "Trout"],
+  ["🐟", "Salmon"],
+  ["🐠", "Angelfish"],
+  ["🐡", "Blowfish"],
+  ["🐙", "Octopus"],
+  ["🦑", "Squid"],
+  ["🦞", "Lobster"],
+  ["🦀", "Crab"],
+  ["🦐", "Prawn"],
+  ["🐊", "Caiman"],
+  ["🐊", "Gharial"],
+  ["🐢", "Loggerhead"],
+  ["🐢", "Terrapin"],
+  ["🦎", "Gecko"],
+  ["🦎", "Iguana"],
+  ["🦎", "Monitor"],
+  ["🐍", "Python"],
+  ["🐍", "Adder"],
+  ["🐍", "Viper"],
+  ["🐍", "Boa"],
+  ["🦋", "Monarch"],
+  ["🦋", "Swallowtail"],
+  ["🐝", "Bumblebee"],
+];
+
+/** How many times to re-roll a title that is already on an open tab. Bounded so a
+ *  narrowed list still terminates instead of spinning. */
+const TITLE_ATTEMPTS = 20;
 
 const HTTP_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "CONNECT", "TRACE"];
 const DEFAULT_FAULT_STATUS = 500;
@@ -1009,7 +1196,65 @@ const NET_RECIPES = {
     length: rnd(9000, 48000), dur: rnd(140, 1100),
     body: () => ({ kind: "text", subtype: "html", text: "<!doctype html>\n<html><body>\n  <iframe title=\"embed host\" src=\"https://liveapp.contoso.com/live/session.aspx?usid=" + hex(16) + "\"></iframe>\n</body></html>" }),
   }),
+  "Embed assets": () => {
+    const f = pick([
+      { p: "/files/v3/embed-bundle.b71f.js", ct: "application/javascript" },
+      { p: "/files/v3/embed-player.9ac2.css", ct: "text/css" },
+      { p: "/files/v3/embed-controls.4d10.js", ct: "application/javascript" },
+    ]);
+    return {
+      method: "GET", hostname: "res-" + rnd(1, 3) + ".cdn.contoso.net",
+      pathname: f.p, query: "",
+      status: rand() < 0.18 ? 304 : 200,
+      contentType: f.ct, length: rnd(12000, 340000), dur: rnd(10, 180),
+      body: (n) => ({ kind: "omitted", reason: "asset", contentType: f.ct, sizeBytes: n }),
+    };
+  },
+  "Contoso Calling": () => ({
+    method: pick(["POST", "GET"]),
+    hostname: "calling.contoso.com",
+    pathname: pick(["/v1/media/negotiate", "/v1/signal/poll", "/v1/participants"]),
+    query: "?cid=" + hex(12),
+    status: rand() < 0.07 ? pick([401, 503]) : 200,
+    contentType: "application/json; charset=utf-8",
+    length: rnd(300, 9000), dur: rnd(30, 600),
+    body: () => ({ kind: "json", text: JSON.stringify({ participants: rnd(2, 12), mediaPath: "relay-" + pick(["eu", "na", "ap"]) + "-" + rnd(1, 9), ttlSeconds: rnd(60, 900) }, null, 2) }),
+  }),
 };
+
+/**
+ * A row recording a TLS connection to a host we never decrypted. All we observe is
+ * the handshake, so `hostname` is the only real content: the URL is just the host,
+ * there is no path, the status is 0 and the method is CONNECT — the tunnel the
+ * client asked for. One row per connection, never per request.
+ */
+function makeUndecryptedRow(ctx, ts, hostname) {
+  return {
+    kind: "network",
+    id: nextId("und"),
+    documentId: ctx.documentId, runId: ctx.runId, runNumber: ctx.runNumber,
+    timestamp: ts, capturedAt: ts,
+    sessionId: undefined,
+    origin: "live",
+    netClass: UNDECRYPTED_CLASS,
+    undecrypted: true,
+    method: "CONNECT",
+    url: "https://" + hostname,
+    hostname,
+    pathname: "",
+    status: 0,
+    statusText: "",
+    contentType: "",
+    contentLength: 0,
+    durationMs: 0,
+    requestHeaders: {},
+    responseHeaders: {},
+    redactedRequestHeaders: [],
+    redactedResponseHeaders: [],
+    requestBody: { kind: "empty" },
+    body: { kind: "empty" },
+  };
+}
 
 function makeNetRow(ctx, ts, forcedClass) {
   const netClass = forcedClass || pick(BUILTIN_CLASSES);
@@ -1148,12 +1393,27 @@ function bodyText(b) {
    COLUMNS
    ═════════════════════════════════════════════════════════════════════════ */
 
-function shortCategory(name, num) {
-  return name.startsWith("ulscat_") ? name.replace("ulscat_", "") + " (" + num + ")" : String(num);
+/** The exact text rendered in the Category column for a captured row. */
+function displayedCategory(row) {
+  if (row.kind === "network") return row.netClass;
+  return row.categoryName.startsWith("ulscat_")
+    ? row.categoryName.slice("ulscat_".length) + " (" + row.category + ")"
+    : String(row.category);
 }
 function oneLine(s) { return s.replace(/\s+/g, " ").trim(); }
 function shortMethod(m) { return m === "OPTIONS" ? "OPT" : m; }
 function networkSummary(r) { return r.pathname + " (" + formatBytes(r.contentLength) + ", " + r.durationMs + "ms)"; }
+
+/**
+ * What the Message column shows for a network row. An `Undecrypted` row records a
+ * TLS connection, not a request, so there is no pathname, size or duration to
+ * summarize — the hostname is the whole payload and the thing you'd act on.
+ */
+function networkMessage(r) {
+  if (r.undecrypted) return r.hostname;
+  const summary = networkSummary(r);
+  return r.fault ? summary + " · " + r.fault.note : summary;
+}
 
 const COLUMN_DEFS = [
   {
@@ -1174,8 +1434,10 @@ const COLUMN_DEFS = [
     id: "tag", label: "Tag", defaultWidth: 110, minWidth: 70,
     render: (r) => {
       if (r.kind === "network") {
-        return el("div.x-cell.x-nettagcell", { title: r.fault ? "Faulted network request (chaos)" : "Network request" },
-          r.fault ? "⚡NET" : "NET");
+        return el("div.x-cell.x-nettagcell", {
+          title: r.undecrypted ? "TLS connection — not decrypted"
+            : r.fault ? "Faulted network request (chaos)" : "Network request",
+        }, r.fault ? "⚡NET" : "NET");
       }
       const t = r.eventTag || r.eventIdHex;
       return el("div.x-cell." + (r.eventTag ? "x-tagcell" : "x-hexcell"), { title: r.eventIdHex }, t);
@@ -1185,8 +1447,8 @@ const COLUMN_DEFS = [
   {
     id: "category", label: "Category", defaultWidth: 132, minWidth: 80,
     render: (r) => r.kind === "network"
-      ? el("div.x-cell", { title: r.netClass + " request" }, r.netClass)
-      : el("div.x-cell", { title: r.categoryName }, shortCategory(r.categoryName, r.category)),
+      ? el("div.x-cell", { title: r.undecrypted ? "TLS connection — not decrypted" : r.netClass + " request" }, r.netClass)
+      : el("div.x-cell", { title: r.categoryName }, displayedCategory(r)),
     sortValue: (r) => (r.kind === "log" ? r.category : r.netClass),
   },
   {
@@ -1206,12 +1468,11 @@ const COLUMN_DEFS = [
     id: "message", label: "Message", defaultWidth: 800, minWidth: 200,
     render: (r) => {
       if (r.kind === "network") {
-        const summary = networkSummary(r);
-        return el("div.x-cell.x-messagecell", { title: r.url }, r.fault ? summary + " · " + r.fault.note : summary);
+        return el("div.x-cell.x-messagecell", { title: r.url }, networkMessage(r));
       }
       return el("div.x-cell.x-messagecell", { title: r.message }, oneLine(r.message));
     },
-    sortValue: (r) => (r.kind === "log" ? r.message : r.pathname),
+    sortValue: (r) => (r.kind === "log" ? r.message : r.undecrypted ? r.hostname : r.pathname),
   },
 ];
 const COLUMN_BY_ID = Object.fromEntries(COLUMN_DEFS.map((c) => [c.id, c]));
@@ -1219,6 +1480,9 @@ const COLUMN_BY_ID = Object.fromEntries(COLUMN_DEFS.map((c) => [c.id, c]));
 const ROW_HEIGHT = 28;
 const OVERSCAN = 12;
 const DETAIL_MIN = 280, DETAIL_MAX = 1000, DETAIL_DEFAULT = 420;
+
+/** The six canonical log levels a `level` mute rule accepts. */
+const LOG_LEVELS = ["Error", "Warning", "Important", "Info", "Verbose", "Spam"];
 
 /** Noise rules the "Mute known noise" button installs. Fictional, like the tags. */
 const KNOWN_NOISE = [
@@ -1233,6 +1497,7 @@ const KNOWN_NOISE = [
 function defaultConfig() {
   return {
     captureUlsLogs: true,
+    showUndecryptedHosts: false,
     builtinsEnabled: {},
     classificationRules: [],
     mitmHosts: BUILTIN_HOSTS.map((h) => Object.assign({}, h, { hostnames: h.hostnames.slice() })),
@@ -1274,12 +1539,15 @@ const state = {
   tabRename: undefined,
   detailFind: { open: false, text: "", index: 0 },
   sections: {},
+  // The Capture dialog's four sections are individually collapsible; all open by default.
+  cfgOpen: { logs: true, decrypt: true, record: true, chaos: true },
   ribbonDismissed: false,
   drafts: {
     muteDraft: "",
-    domain: "", domainRecord: true, domainError: "",
+    domain: "", domainLabel: "", domainRecord: true, domainError: "",
     recordHost: "", recordLabel: "", recordKind: "url-substring", recordValue: "", recordError: "",
     faultClass: "", faultUrl: "", showUrlContains: false, faultMethods: [],
+    filterScopes: ["url"], filterNegate: false,
     faultProb: "100", faultDelay: "0",
     reqAction: "block", reqUrlMode: "keep", reqUrl: "", reqHeaderMode: "keep", reqHeaders: "",
     reqBodyMode: "keep", reqBody: "",
@@ -1294,20 +1562,27 @@ function docById(id) { return state.documents.find((d) => d.id === id); }
 function liveDoc() { return state.documents.find((d) => d.id === state.capture.liveDocumentId); }
 
 let _docSeq = 0;
+
+/** One uniformly random animal title, re-rolled while it collides with an open tab. */
 function nextCaptureTitle() {
-  const used = new Set(state.documents.filter((d) => d.autoTitle).map((d) => d.autoNumber));
-  let n = 1;
-  while (used.has(n)) n++;
-  return { title: "Capture " + n, number: n };
+  const taken = new Set(state.documents.map((d) => d.title));
+  let title = "";
+  for (let i = 0; i < TITLE_ATTEMPTS; i++) {
+    const a = CAPTURE_ANIMALS[Math.floor(rand() * CAPTURE_ANIMALS.length)] || CAPTURE_ANIMALS[0];
+    title = a[0] + " " + a[1];
+    if (!taken.has(title)) break;
+  }
+  return title;
 }
+
 function createDocument(kind, title) {
   const auto = kind === "capture" && !title ? nextCaptureTitle() : null;
   const doc = {
     id: "doc-" + (++_docSeq),
     kind,
-    title: title || (auto ? auto.title : "Document"),
+    title: title || auto || "Document",
     autoTitle: !!auto,
-    autoNumber: auto ? auto.number : 0,
+    autoName: auto || "",
     status: "idle",
     rows: [],
     runs: [],
@@ -1323,14 +1598,51 @@ function createDocument(kind, title) {
 
 /* ── Derived views ───────────────────────────────────────────────────────── */
 
+/**
+ * Mute rules come in five kinds. `session` and `category` read fields that both
+ * log and network rows carry, so those hide network rows too; `level`, `tag` and
+ * `regex` are log-only.
+ */
 function compileMutes(rules) {
-  const tags = new Set(), regexes = [];
+  const tags = new Set(), regexes = [], sessions = new Set(), categories = new Set(), levels = new Set();
   for (const r of rules) {
     if (!r.value) continue;
     if (r.kind === "tag") tags.add(r.value);
-    else { try { regexes.push(new RegExp(r.value, "i")); } catch { /* ignore bad regex */ } }
+    else if (r.kind === "session") sessions.add(r.value);
+    else if (r.kind === "category") categories.add(r.value);
+    else if (r.kind === "level") levels.add(r.value);
+    else if (r.kind === "regex") {
+      // An invalid user-edited expression is inert rather than breaking the view.
+      try { regexes.push(new RegExp(r.value, "i")); } catch { /* ignore */ }
+    }
   }
-  return { tags, regexes, any: tags.size > 0 || regexes.length > 0 };
+  return {
+    tags, regexes, sessions, categories, levels,
+    any: tags.size > 0 || regexes.length > 0 || sessions.size > 0 || categories.size > 0 || levels.size > 0,
+  };
+}
+
+function rowMatchesMute(row, m) {
+  if (row.sessionId && m.sessions.has(row.sessionId)) return true;
+  if (m.categories.size > 0 && m.categories.has(displayedCategory(row))) return true;
+  if (row.kind === "network") return false;
+  if (m.levels.has(row.levelName)) return true;
+  if (m.tags.has(row.eventIdHex) || (row.eventTag != null && m.tags.has(row.eventTag))) return true;
+  return m.regexes.some((re) => re.test(row.message));
+}
+
+/** The mute rules a row's context menu offers, in the app's order. */
+function muteActionsForRow(row) {
+  const actions = [];
+  if (row.sessionId) actions.push({ id: "session", label: "Mute this session", rule: { kind: "session", value: row.sessionId } });
+  actions.push({ id: "category", label: "Mute this category", rule: { kind: "category", value: displayedCategory(row) } });
+  if (row.kind === "network") return actions;
+  actions.push(
+    { id: "level", label: "Mute this level", rule: { kind: "level", value: row.levelName } },
+    { id: "tag", label: "Mute this tag", rule: { kind: "tag", value: row.eventTag || row.eventIdHex } }
+  );
+  if (row.message) actions.push({ id: "message", label: "Mute this message", rule: { kind: "regex", value: escapeRegex(row.message) } });
+  return actions;
 }
 
 function rowMatchesSearch(r, lower) {
@@ -1377,10 +1689,7 @@ function visibleRows() {
       if (r.kind === "marker" || r.kind === "run-boundary") return true;
       if (state.rowKindFilter === "logs" && r.kind !== "log") return false;
       if (state.rowKindFilter === "network" && r.kind !== "network") return false;
-      if (mutes.any && r.kind === "log") {
-        if (mutes.tags.size && (mutes.tags.has(r.eventIdHex) || (r.eventTag && mutes.tags.has(r.eventTag)))) return false;
-        if (mutes.regexes.some((re) => re.test(r.message))) return false;
-      }
+      if (mutes.any && rowMatchesMute(r, mutes)) return false;
       return rowMatchesSearch(r, lower);
     });
   }
@@ -1434,13 +1743,33 @@ function selectedRow() {
 let streamTimer = null;
 let transitionTimer = null;
 
-function armedFaultFor(netClass, url, method) {
+/**
+ * Does an armed fault rule match this request? The content filter searches the
+ * chosen scopes and ORs them; `negate` inverts the whole predicate, so a scope
+ * with nothing to search (a bodyless GET) counts as "does not contain".
+ */
+function faultFilterMatches(filter, row) {
+  if (!filter || !filter.value) return true;
+  const needle = filter.value.toLowerCase();
+  const hit = filter.scopes.some((scope) => {
+    if (scope === "url") return row.url.toLowerCase().includes(needle);
+    if (scope === "header") {
+      return Object.keys(row.requestHeaders).some((k) =>
+        (k + ": " + row.requestHeaders[k]).toLowerCase().includes(needle));
+    }
+    const t = bodyText(row.requestBody);
+    return t != null && t.toLowerCase().includes(needle);
+  });
+  return filter.negate ? !hit : hit;
+}
+
+function armedFaultFor(row) {
   if (!state.config.chaosEnabled) return undefined;
   for (const f of state.config.faultRules) {
     if (!f.enabled) continue;
-    if (f.targetClass !== netClass) continue;
-    if (f.urlContains && !url.toLowerCase().includes(f.urlContains.toLowerCase())) continue;
-    if (f.methods && f.methods.length && !f.methods.includes(method)) continue;
+    if (f.targetClass !== row.netClass) continue;
+    if (f.methods && f.methods.length && !f.methods.includes(row.method)) continue;
+    if (!faultFilterMatches(f.filter, row)) continue;
     if (rand() > f.probability) continue;
     return f;
   }
@@ -1467,6 +1796,12 @@ function emitBatch() {
   const classes = recordedClasses();
   for (let i = 0; i < n; i++) {
     const ts = now + i;
+    // Discovery rows: a TLS connection to a host we never decrypt. Occasional,
+    // because they fire per connection rather than per request.
+    if (state.config.showUndecryptedHosts && rand() < 0.13) {
+      fresh.push(makeUndecryptedRow(ctx, ts, pick(UNDECRYPTED_HOSTS)));
+      continue;
+    }
     let row;
     const wantNetwork = classes.length > 0 && rand() < 0.34;
     if (!wantNetwork && !state.config.captureUlsLogs) {
@@ -1479,7 +1814,7 @@ function emitBatch() {
       row = makeLogRow(ctx, ts);
     }
     if (row.kind === "network") {
-      const f = armedFaultFor(row.netClass, row.url, row.method);
+      const f = armedFaultFor(row);
       if (f) applyFaultToRow(row, f);
     }
     fresh.push(row);
@@ -1643,13 +1978,43 @@ function restoreFocus(snap) {
   if (!snap) return;
   const node = document.querySelector('[data-k="' + snap.k + '"]');
   if (!node) return;
-  node.focus();
+  // preventScroll matters: a plain focus() scrolls the field into view, which
+  // would undo restoreScrolls and snap a scrolled dialog back on every keystroke.
+  try { node.focus({ preventScroll: true }); } catch { node.focus(); }
   if (snap.start !== undefined && node.setSelectionRange) {
     try { node.setSelectionRange(snap.start, snap.end); } catch { /* not a text input */ }
   }
 }
 
+/* Scroll-position memory.
+ *
+ * Regions are rebuilt wholesale on every render, so any scroll container inside
+ * one would jump back to the top — the Capture dialog on each toggle, and the
+ * Details panel roughly three times a second while capture is streaming. Any
+ * element tagged `data-scroll="<key>"` has its offsets remembered under that key
+ * and restored after the swap. Keys that encode identity (the selected row id)
+ * reset naturally when the identity changes. */
+const scrollMemo = new Map();
+function captureScrolls() {
+  for (const n of document.querySelectorAll("[data-scroll]")) {
+    const k = n.dataset.scroll;
+    if (n.scrollTop || n.scrollLeft) scrollMemo.set(k, { top: n.scrollTop, left: n.scrollLeft });
+    else scrollMemo.delete(k);
+  }
+}
+function restoreScrolls() {
+  for (const n of document.querySelectorAll("[data-scroll]")) {
+    const m = scrollMemo.get(n.dataset.scroll);
+    if (!m) continue;
+    if (m.top) n.scrollTop = m.top;
+    if (m.left) n.scrollLeft = m.left;
+  }
+}
+
 let renderQueued = false;
+/** True only while renderNow is swapping regions. Lets blur handlers tell a real
+ *  user blur from the one a rebuild fires as it tears the focused node out. */
+let isRendering = false;
 function renderAll() {
   if (renderQueued) return;
   renderQueued = true;
@@ -1658,27 +2023,34 @@ function renderAll() {
 
 function renderNow() {
   const snap = captureFocus();
+  captureScrolls();
   const doc = activeDoc();
 
-  // Shell is built once; regions are swapped in place so the table scroller and
-  // its scroll offset survive every re-render.
-  if (!appEl.firstChild) {
-    appEl.appendChild(el("div#region-ribbon"));
-    appEl.appendChild(el("div#region-topbar"));
-    const body = el("div.x-body#region-body");
-    body.appendChild(el("div.x-tablewrap#region-table"));
-    body.appendChild(el("div#region-detail", { style: { display: "contents" } }));
-    appEl.appendChild(body);
-    appEl.appendChild(el("div#region-dock"));
+  isRendering = true;
+  try {
+    // Shell is built once; regions are swapped in place so the table scroller and
+    // its scroll offset survive every re-render.
+    if (!appEl.firstChild) {
+      appEl.appendChild(el("div#region-ribbon"));
+      appEl.appendChild(el("div#region-topbar"));
+      const body = el("div.x-body#region-body");
+      body.appendChild(el("div.x-tablewrap#region-table"));
+      body.appendChild(el("div#region-detail", { style: { display: "contents" } }));
+      appEl.appendChild(body);
+      appEl.appendChild(el("div#region-dock"));
+    }
+
+    swap("region-ribbon", renderRibbon());
+    swap("region-topbar", renderTopBar());
+    renderTableRegion(doc);
+    swap("region-detail", renderDetailPanel());
+    swap("region-dock", renderDock());
+    renderOverlay();
+  } finally {
+    isRendering = false;
   }
 
-  swap("region-ribbon", renderRibbon());
-  swap("region-topbar", renderTopBar());
-  renderTableRegion(doc);
-  swap("region-detail", renderDetailPanel());
-  swap("region-dock", renderDock());
-  renderOverlay();
-
+  restoreScrolls();
   restoreFocus(snap);
 }
 
@@ -1780,6 +2152,8 @@ function renderOverlay() {
   if (!o) return;
   const content = OVERLAYS[o.kind] ? OVERLAYS[o.kind](o) : null;
   if (!content) { state.overlay = null; return; }
+  // Tag the panel so its scroll offset survives the rebuild (see scrollMemo).
+  content.dataset.scroll = "overlay:" + o.kind;
   const scrim = el("div.x-scrim", { onmousedown: (e) => { if (e.target === scrim) closeOverlay(); } });
   overlayEl.appendChild(scrim);
   overlayEl.appendChild(content);
@@ -1832,6 +2206,7 @@ function fbtn(o) {
 
 function finput(o) {
   const wrap = el("div", { class: "f-input" + (o.size === "md" ? " md" : "") + (o.className ? " " + o.className : ""), style: o.style || null });
+  if (o.contentBefore) add(wrap, [o.contentBefore]);
   const input = el("input", {
     type: o.type || "text",
     value: o.value === undefined || o.value === null ? "" : String(o.value),
@@ -1945,6 +2320,7 @@ const KIND_FILTERS = [
 function countCustomizations() {
   const c = state.config;
   return (c.captureUlsLogs === false ? 1 : 0)
+    + (c.showUndecryptedHosts === true ? 1 : 0)
     + BUILTIN_CLASSES.filter((k) => c.builtinsEnabled[k] === false).length
     + c.mitmHosts.filter((h) => h.builtin && !h.enabled).length
     + c.mitmHosts.filter((h) => !h.builtin).length
@@ -2100,8 +2476,8 @@ function renderTopBar() {
             className: state.muteRules.length ? "checked" : "",
             checked: state.muteRules.length > 0,
             tip: state.muteRules.length
-              ? "Mute — " + state.muteRules.length + " rule" + (state.muteRules.length > 1 ? "s" : "") + " hiding rows (click to manage)"
-              : "Mute — hide noisy rows by tag or message",
+              ? "Mute — " + state.muteRules.length + " global rule" + (state.muteRules.length > 1 ? "s" : "") + " hiding rows"
+              : "Mute — hide matching rows in every tab",
             onclick: (e) => toggleOverlay("mute", e.currentTarget),
           })),
       })));
@@ -2197,15 +2573,21 @@ OVERLAYS.mute = () => {
     d.muteDraft = "";
     addMuteRule({ kind: "regex", value: v });
   };
+  // `regex` reads as "message" in the list: the rule matches the message text, and
+  // the word regex describes how, not what.
+  const kindLabel = (k) => (k === "regex" ? "message" : k);
+  const knownNoiseMuted = KNOWN_NOISE.every((n) => state.muteRules.some((r) => r.kind === n.kind && r.value === n.value));
+
   return el("div.x-popover", null, el("div.x-mute", null,
-    el("span.x-mutetitle", null, "Muted events"),
-    state.muteRules.length === 0
-      ? el("span.x-muteempty", null, "Nothing muted. Right-click a row → “Mute this tag” / “Mute this message”, or add a message regex below.")
-      : el("div.x-mutelist", null, state.muteRules.map((r) =>
+    el("span.x-mutetitle", null, "Mute rules"),
+    el("span.x-mutescope", null, "Applies to every tab and persists across app restarts."),
+    state.muteRules.length > 0
+      ? el("div.x-mutelist", null, state.muteRules.map((r) =>
           el("div.x-muterow2", null,
-            el("span.x-mutekind", null, r.kind),
+            el("span.x-mutekind", null, kindLabel(r.kind)),
             el("span.x-muteval", { title: r.value }, r.value),
-            fbtn({ icon: ICON.dismiss, size: "sm", appearance: "subtle", tip: "Remove", onclick: () => removeMuteRule(r) })))),
+            fbtn({ icon: ICON.dismiss, size: "sm", appearance: "subtle", tip: "Remove", onclick: () => removeMuteRule(r) }))))
+      : null,
     el("div.x-addrow", null,
       finput({
         key: "mute-draft", value: d.muteDraft, placeholder: "message regex…", style: { flex: "1" },
@@ -2213,11 +2595,24 @@ OVERLAYS.mute = () => {
         onkeydown: (e) => { if (e.key === "Enter") addDraft(); },
       }),
       fbtn({ size: "sm", icon: ICON.addSm, label: "Add", disabled: !d.muteDraft.trim(), onclick: addDraft })),
+    // Both actions render unconditionally — disabling rather than hiding keeps the
+    // popover's width and layout fixed as rules come and go.
     el("div.x-muteactions", null,
-      fbtn({ size: "sm", appearance: "subtle", label: "Mute known noise", onclick: () => { KNOWN_NOISE.forEach(addMuteRule); } }),
-      state.muteRules.length > 0
-        ? fbtn({ size: "sm", appearance: "subtle", label: "Clear all", onclick: () => { state.muteRules = []; renderAll(); } })
-        : null)));
+      fbtn({
+        size: "sm", appearance: "subtle", label: "Mute known noise", disabled: knownNoiseMuted,
+        tip: knownNoiseMuted
+          ? "Already muted — the " + KNOWN_NOISE.length + " built-in noise rules are in the list above. Remove any of them individually to bring those rows back."
+          : "Adds " + KNOWN_NOISE.length + " rules for the highest-frequency chatter in a normal capture. They appear in the list above and can be removed individually.",
+        onclick: () => { KNOWN_NOISE.forEach(addMuteRule); },
+      }),
+      fbtn({
+        size: "sm", appearance: "subtle", label: "Clear all", disabled: state.muteRules.length === 0,
+        onclick: () => { state.muteRules = []; renderAll(); },
+      })),
+    // Same footer shape as the Capture dialog: path on the left, Reveal on the right.
+    el("div.x-cfgfooter", null,
+      attachTip(el("span.x-path", null, "%APPDATA%/Inspector/mute-config.json"), "%APPDATA%/Inspector/mute-config.json"),
+      fbtn({ size: "sm", appearance: "subtle", label: "Reveal file", onclick: () => showToast("Demo — no file to reveal") }))));
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2225,8 +2620,16 @@ OVERLAYS.mute = () => {
    ═════════════════════════════════════════════════════════════════════════ */
 
 const MCP_SERVER_NAME = "inspector-demo";
-const MCP_NOTICE = "A local, read-only MCP server that exposes the capture to an AI client (Claude Code / Copilot CLI) through triage tools — summarize, query, and inspect rows. Off by default; binds to 127.0.0.1 only; cannot start capture or change anything.";
-const MCP_TOOLS = "summarize_capture · query_rows · get_row · get_recent · list_sessions · get_capture_state";
+const MCP_NOTICE = "A local MCP server that exposes the capture to an AI client (Claude Code / Copilot CLI): triage tools to summarize, query and inspect rows, plus tools to change what is decrypted, recorded, muted and faulted. Every change is previewed first and applied only on a second, confirming call. Off by default; binds to 127.0.0.1 only; cannot start a capture or install certificates.";
+// Ordered the way you'd use them: orient, triage, inspect the setup, then change it.
+const MCP_TOOLS = [
+  "list_documents", "get_capture_state", "summarize_capture", "query_rows", "get_recent", "get_row",
+  "list_sessions", "get_capture_config", "get_mute_config", "list_fault_targets",
+  "add_decrypt_host", "set_decrypt_host_enabled", "remove_decrypt_host", "add_record_rule",
+  "set_record_rule_enabled", "remove_record_rule", "set_builtin_class_enabled",
+  "add_fault_rule", "set_fault_rule_enabled", "remove_fault_rule", "set_chaos_armed",
+  "add_mute_rule", "remove_mute_rule",
+];
 
 OVERLAYS.mcp = () => {
   const enabled = state.mcp.enabled;
@@ -2246,8 +2649,8 @@ OVERLAYS.mcp = () => {
       el("div", { style: { marginLeft: "auto" } },
         fswitch(enabled, (v) => { state.mcp.enabled = v; renderAll(); }, { ariaLabel: "Enable MCP server" }))),
     el("span.x-hint", null, enabled
-      ? "Listening on 127.0.0.1 — read-only, 6 tools."
-      : "Off — a local, read-only endpoint for an AI client."),
+      ? "Listening on 127.0.0.1 — " + MCP_TOOLS.length + " tools; changes are previewed first."
+      : "Off — a local endpoint for an AI client."),
     enabled ? [
       el("div.x-urlrow", null, el("span.x-url", { title: url }, url), copyBtn(url)),
       el("span.x-cfglabel", null, "Connect a client"),
@@ -2259,7 +2662,7 @@ OVERLAYS.mcp = () => {
         copyBtn(jsonCmd, "Copy")),
       el("span.x-cfglabel", null, "Example usage"),
       el("span.x-hint", null, "“summarize the current capture with " + MCP_SERVER_NAME + "”"),
-      el("span.x-tools", null, MCP_TOOLS),
+      el("span.x-tools", null, MCP_TOOLS.join(" · ")),
     ] : null,
     el("hr.f-divider"),
     el("div.x-cfgfooter", null,
@@ -2272,11 +2675,23 @@ OVERLAYS.mcp = () => {
    ═════════════════════════════════════════════════════════════════════════ */
 
 const DECRYPT_NOTICE = "Decrypting a host intercepts all of its HTTPS while capturing — it can interfere with other apps that use the same host. Turn a host off to alleviate. Adding a domain decrypts it the same way; broader patterns (like *.example.com) intercept more.";
+/** The one thing about the discovery rows the switch's sub-line doesn't already say. */
+const UNDECRYPTED_NOTICE = "One row per connection, not per request — a request over an already-open connection produces none.";
+/** Shown on the chaos filter's `!` toggle: the one behaviour the control doesn't imply. */
+const FILTER_NEGATE_HINT = "Off: fault requests that contain this text. On: fault the ones where it appears in none of the chosen scopes. A request with no body — any GET — counts as not containing it.";
 const RECORD_NOTICE = "What becomes a network row. Built-in recipes (toggle on/off) plus your own rules — each records a decrypted host's requests, optionally filtered by URL, under a Category. Decrypt the host first; recording is what surfaces it.";
-const CHAOS_NOTICE = "Fault injection — make matching requests fail so you can watch how the app (and its logs) react. Off by default: arm it, attach a fault to a recorded request type (its Category — the entries under Record above), optionally narrowed by URL substring / HTTP method, then run your scenario. Live capture only; the real upstream response is kept on every faulted row for comparison.";
+const CHAOS_NOTICE = "Fault injection — make matching requests fail so you can watch how the app (and its logs) react. Off by default: arm it, attach a fault to a recorded request type (its Category — the entries under Record above), optionally narrowed by a content filter / HTTP method, then run your scenario. Live capture only; the real upstream response is kept on every faulted row for comparison.";
 const REQ_ACTION_INFO = {
   forward: "Send the request upstream — optionally editing its body, headers, or URL (a full URL incl. host, to redirect it) first.",
   block: "Don't contact the server at all. The client's response is authored below (Respond), or the connection is closed (Drop).",
+};
+/** Where a fault's content filter looks. `body` is the REQUEST body — matching
+ *  happens before the request is forwarded, so no response exists yet. */
+const FAULT_MATCH_SCOPES = ["url", "header", "body"];
+const SCOPE_INFO = {
+  url: "Search the full request URL.",
+  header: "Search the request headers — each as “name: value”, so the text can match a header name, a value, or a whole line.",
+  body: "Search the request body (text, first 256 KB). Not the response — it doesn't exist yet.",
 };
 const KIND_INFO = {
   respond: "Deliver a response — optionally tampered: override the status, edit the body (empty / truncate / replace), and/or edit the headers. No edits + a delay = a slow real response.",
@@ -2286,6 +2701,7 @@ const KIND_INFO = {
 const MAX_REGEX_SOURCE_LEN = 400;
 function isReservedLabel(label) {
   const l = label.trim().toLowerCase();
+  if (l === UNDECRYPTED_CLASS.toLowerCase()) return true;
   return BUILTIN_CLASSES.some((c) => c.toLowerCase() === l);
 }
 function isLikelyCatastrophicRegex(src) {
@@ -2314,8 +2730,10 @@ function hostLabelFor(hostId) {
 
 /** Summarize a fault rule the way the app's rule list does. */
 function faultSummary(f) {
-  const narrow = [f.methods && f.methods.length ? f.methods.join("/") : null, f.urlContains ? "“" + f.urlContains + "”" : null]
-    .filter(Boolean).join(" · ");
+  const narrow = [
+    f.methods && f.methods.length ? f.methods.join("/") : null,
+    f.filter ? (f.filter.negate ? "not " : "") + "“" + f.filter.value + "” in " + f.filter.scopes.join("+") : null,
+  ].filter(Boolean).join(" · ");
   const reqParts = [];
   if (f.request && f.request.action === "block") reqParts.push("block");
   else if (f.request) {
@@ -2373,7 +2791,14 @@ function composeDraftRule() {
     probability: parsePercent(d.faultProb),
     kind: d.faultKind,
   };
-  if (d.faultUrl.trim()) rule.urlContains = d.faultUrl.trim();
+  if (d.faultUrl.trim()) {
+    rule.filter = {
+      value: d.faultUrl.trim(),
+      scopes: FAULT_MATCH_SCOPES.filter((s) => d.filterScopes.includes(s)),
+      negate: d.filterNegate || undefined,
+    };
+    if (!rule.filter.scopes.length) rule.filter.scopes = ["url"];
+  }
   if (d.faultMethods.length) rule.methods = d.faultMethods.slice();
   const delay = clampDelaySec(d.faultDelay);
   if (delay) rule.delaySec = delay;
@@ -2405,6 +2830,7 @@ function resetFaultDraft() {
   const d = state.drafts;
   Object.assign(d, {
     faultClass: "", faultUrl: "", showUrlContains: false, faultMethods: [],
+    filterScopes: ["url"], filterNegate: false,
     faultProb: "100", faultDelay: "0",
     reqAction: "block", reqUrlMode: "keep", reqUrl: "", reqHeaderMode: "keep", reqHeaders: "",
     reqBodyMode: "keep", reqBody: "",
@@ -2428,9 +2854,12 @@ function classifyTestUrl(raw) {
       if (on("Thumbnail") && p.includes("getthumbnailurl.ashx")) cls = "Thumbnail";
       else if (on("Session") && p.includes("/session.aspx")) cls = "Session";
       else if (on("Items") && p.includes("/items")) cls = "Items";
-    } else if (rule.id === "cdn" && on("Asset")) cls = "Asset";
-    else if (rule.id === "media" && on("Media") && p.includes("/transform")) cls = "Media";
+    } else if (rule.id === "cdn") {
+      if (on("Embed assets") && (p.includes("/files/") || p.includes("embed-"))) cls = "Embed assets";
+      else if (on("Asset")) cls = "Asset";
+    } else if (rule.id === "media" && on("Media") && p.includes("/transform")) cls = "Media";
     else if (rule.id === "drive" && on("Embed") && p.includes("/embed.aspx")) cls = "Embed";
+    else if (rule.id === "calling" && on("Contoso Calling")) cls = "Contoso Calling";
   }
   if (!cls) {
     for (const r of state.config.classificationRules) {
@@ -2459,15 +2888,15 @@ OVERLAYS.capture = () => {
     const n = normalizeDomainInput(d.domain);
     if (n.error) { d.domainError = n.error; renderAll(); return; }
     if (c.mitmHosts.some((h) => h.hostnames.includes(n.value))) { d.domainError = "That domain is already listed."; renderAll(); return; }
+    const label = d.domainLabel.trim() || n.value;
     const id = "u-" + hex(6);
-    c.mitmHosts = c.mitmHosts.concat([{ id, label: n.value, hostnames: [n.value], enabled: true, builtin: false }]);
+    c.mitmHosts = c.mitmHosts.concat([{ id, label, hostnames: [n.value], enabled: true, builtin: false }]);
     if (d.domainRecord) {
       c.classificationRules = c.classificationRules.concat([{
-        id: "r-" + hex(6), hostId: id, label: n.value.replace(/^\*\./, "").split(".")[0] || n.value,
-        enabled: true, match: { kind: "url-substring", value: "" },
+        id: "r-" + hex(6), hostId: id, label, enabled: true, match: { kind: "url-substring", value: "" },
       }]);
     }
-    d.domain = ""; d.domainError = "";
+    d.domain = ""; d.domainLabel = ""; d.domainError = "";
     renderAll();
   };
 
@@ -2491,105 +2920,130 @@ OVERLAYS.capture = () => {
     || (d.faultKind === "respond" && d.reqAction === "block" && !d.faultStatus.trim());
   const draftSummary = d.faultClass ? faultSummary(composeDraftRule()) : "pick a Category…";
 
+  /** A section header with its chevron disclosure button. */
+  const sectionHeader = (key, label, notice, trailing) => el("div.x-cfghdr", null,
+    el("span.x-cfglabel", null, label),
+    fbtn({
+      size: "sm", appearance: "subtle",
+      icon: state.cfgOpen[key] ? ICON.chevDown : ICON.chevRight,
+      ariaLabel: (state.cfgOpen[key] ? "Collapse " : "Expand ") + label,
+      onclick: () => { state.cfgOpen[key] = !state.cfgOpen[key]; renderAll(); },
+    }),
+    notice ? attachTip(el("span.x-info", { html: ICON.info, tabindex: "0", "aria-label": "About " + label }), notice) : null,
+    trailing || null);
+
   const panel = el("div.x-cfg", null,
 
     /* ── LOGS ── */
-    el("div.x-cfghdr", null, el("span.x-cfglabel", null, "Logs")),
-    el("div.x-listrow", null,
+    sectionHeader("logs", "Logs"),
+    state.cfgOpen.logs ? el("div.x-listrow", null,
       el("div.x-listtext", null,
         el("span.x-listname", null, "ULS logs"),
         el("span.x-listsub", null, "RemoteLogs.ashx → decoded log rows · the primary capture")),
-      fswitch(c.captureUlsLogs !== false, (v) => { c.captureUlsLogs = v; renderAll(); }, { ariaLabel: "Capture ULS logs" })),
+      fswitch(c.captureUlsLogs !== false, (v) => { c.captureUlsLogs = v; renderAll(); }, { ariaLabel: "Capture ULS logs" })) : null,
 
     el("hr.f-divider"),
 
     /* ── DECRYPT ── */
-    el("div.x-cfghdr", null,
-      el("span.x-cfglabel", null, "Decrypt"),
-      attachTip(el("span.x-info", { html: ICON.info, tabindex: "0", "aria-label": "About decrypting hosts" }), DECRYPT_NOTICE)),
-    el("div.x-list", null, c.mitmHosts.map((h) =>
+    sectionHeader("decrypt", "Decrypt", DECRYPT_NOTICE),
+    state.cfgOpen.decrypt ? [
+      el("div.x-list", null, c.mitmHosts.map((h) =>
+        el("div.x-listrow", null,
+          el("div.x-listtext", null,
+            el("span.x-listname", { title: h.label }, h.label),
+            el("span.x-listsub", { title: h.hostnames.join(" · ") }, h.hostnames.join(" · "))),
+          el("div.x-listctl", null,
+            h.builtin ? null : fbtn({
+              icon: ICON.dismiss, size: "sm", appearance: "subtle", tip: "Remove domain",
+              onclick: () => {
+                c.mitmHosts = c.mitmHosts.filter((x) => x.id !== h.id);
+                c.classificationRules = c.classificationRules.filter((r) => r.hostId !== h.id);
+                if (d.recordHost === h.id) d.recordHost = "";
+                renderAll();
+              },
+            }),
+            fswitch(h.enabled, (v) => { h.enabled = v; renderAll(); }, { ariaLabel: "Decrypt " + h.label }))))),
+      el("div.x-addarea", null,
+        el("div.x-addrow", null,
+          finput({
+            key: "cfg-domain", value: d.domain, placeholder: "add a domain…  e.g. contoso.com", style: { flex: "1" },
+            oninput: (v) => { d.domain = v; d.domainError = ""; renderAll(); },
+            onkeydown: (e) => { if (e.key === "Enter") addDomain(); },
+          }),
+          finput({
+            key: "cfg-domain-label", value: d.domainLabel, placeholder: "label (optional)", style: { width: "128px" },
+            oninput: (v) => { d.domainLabel = v; renderAll(); },
+            onkeydown: (e) => { if (e.key === "Enter") addDomain(); },
+          })),
+        el("div.x-addrow", null,
+          fcheck(d.domainRecord, "Record", (v) => { d.domainRecord = v; renderAll(); },
+            { tip: "Also create a Record entry using this label (or the domain) as its Category." }),
+          el("span", { style: { marginLeft: "auto" } },
+            fbtn({ size: "sm", icon: ICON.addSm, label: "Add", disabled: !d.domain.trim(), onclick: addDomain })))),
+      d.domainError ? el("span.x-err", null, d.domainError) : null,
+      // Sits after the add form because it answers "what should I add?". Unlike the
+      // host list, this takes effect immediately rather than at capture start.
       el("div.x-listrow", null,
         el("div.x-listtext", null,
-          el("span.x-listname", { title: h.label }, h.label),
-          el("span.x-listsub", { title: h.hostnames.join(" · ") }, h.hostnames.join(" · "))),
+          el("span.x-listname", null, "Show undecrypted hosts"),
+          el("span.x-listsub", null, "undecrypted TLS connections → one row each · hostname only")),
         el("div.x-listctl", null,
-          h.builtin ? null : fbtn({
-            icon: ICON.dismiss, size: "sm", appearance: "subtle", tip: "Remove domain",
-            onclick: () => {
-              c.mitmHosts = c.mitmHosts.filter((x) => x.id !== h.id);
-              c.classificationRules = c.classificationRules.filter((r) => r.hostId !== h.id);
-              if (d.recordHost === h.id) d.recordHost = "";
-              renderAll();
-            },
-          }),
-          fswitch(h.enabled, (v) => { h.enabled = v; renderAll(); }, { ariaLabel: "Decrypt " + h.label }))))),
-    el("div.x-addrow", null,
-      finput({
-        key: "cfg-domain", value: d.domain, placeholder: "add a domain…  e.g. contoso.com", style: { flex: "1" },
-        oninput: (v) => { d.domain = v; d.domainError = ""; renderAll(); },
-        onkeydown: (e) => { if (e.key === "Enter") addDomain(); },
-      }),
-      fcheck(d.domainRecord, "Record", (v) => { d.domainRecord = v; renderAll(); },
-        { tip: "Also create a Record entry for this domain so its requests show up as rows (editable below)." }),
-      fbtn({ size: "sm", icon: ICON.addSm, label: "Add", disabled: !d.domain.trim(), onclick: addDomain })),
-    d.domainError ? el("span.x-err", null, d.domainError) : null,
-    el("span.x-hint", null, "Decrypt changes apply on the next Start. Decrypting alone doesn’t show rows — record them under Record below."),
+          attachTip(el("span.x-info", { html: ICON.info, tabindex: "0", "aria-label": "About undecrypted-host rows" }), UNDECRYPTED_NOTICE),
+          fswitch(c.showUndecryptedHosts === true, (v) => { c.showUndecryptedHosts = v; renderAll(); }, { ariaLabel: "Show undecrypted hosts" }))),
+      el("span.x-hint", null, "Decrypt changes apply on the next Start. Decrypting alone doesn’t show rows — record them under Record below."),
+    ] : null,
 
     el("hr.f-divider"),
 
     /* ── RECORD AS NETWORK ROWS ── */
-    el("div.x-cfghdr", null,
-      el("span.x-cfglabel", null, "Record as network rows"),
-      attachTip(el("span.x-info", { html: ICON.info, tabindex: "0", "aria-label": "About network-row recording" }), RECORD_NOTICE)),
-    el("div.x-list", null, BUILTIN_CLASSES.map((cls) =>
-      el("div.x-listrow", null,
-        el("div.x-listtext", null,
-          el("span.x-listname", null, cls),
-          el("span.x-listsub", { title: BUILTIN_CLASS_INFO[cls] }, BUILTIN_CLASS_INFO[cls])),
-        fswitch(c.builtinsEnabled[cls] !== false, (v) => { c.builtinsEnabled[cls] = v; renderAll(); }, { ariaLabel: "Record " + cls })))),
-
-    el("span.x-hint", null, "Custom rules — record a decrypted host’s requests under a Category. Leave the URL blank to record all of them."),
-    c.classificationRules.length ? el("div.x-list", null, c.classificationRules.map((r) =>
-      el("div.x-listrow", null,
-        el("div.x-listtext", null,
-          el("span.x-listname", { title: r.label }, r.label),
-          el("span.x-listsub", { title: hostLabelFor(r.hostId) + " · " + (r.match.value || "all requests") },
-            hostLabelFor(r.hostId) + " · " + (r.match.value || "all requests"))),
-        el("div.x-listctl", null,
-          fbtn({
-            icon: ICON.dismiss, size: "sm", appearance: "subtle", tip: "Remove rule",
-            onclick: () => { c.classificationRules = c.classificationRules.filter((x) => x.id !== r.id); renderAll(); },
+    sectionHeader("record", "Record as network rows", RECORD_NOTICE),
+    state.cfgOpen.record ? [
+      el("div.x-list", null, BUILTIN_CLASSES.map((cls) =>
+        el("div.x-listrow", null,
+          el("div.x-listtext", null,
+            el("span.x-listname", null, cls),
+            el("span.x-listsub", { title: BUILTIN_CLASS_INFO[cls] }, BUILTIN_CLASS_INFO[cls])),
+          fswitch(c.builtinsEnabled[cls] !== false, (v) => { c.builtinsEnabled[cls] = v; renderAll(); }, { ariaLabel: "Record " + cls })))),
+      el("span.x-hint", null, "Custom rules — record a decrypted host’s requests under a Category. Leave the URL blank to record all of them."),
+      c.classificationRules.length ? el("div.x-list", null, c.classificationRules.map((r) =>
+        el("div.x-listrow", null,
+          el("div.x-listtext", null,
+            el("span.x-listname", { title: r.label }, r.label),
+            el("span.x-listsub", { title: hostLabelFor(r.hostId) + " · " + (r.match.value || "all requests") },
+              hostLabelFor(r.hostId) + " · " + (r.match.value || "all requests"))),
+          el("div.x-listctl", null,
+            fbtn({
+              icon: ICON.dismiss, size: "sm", appearance: "subtle", tip: "Remove rule",
+              onclick: () => { c.classificationRules = c.classificationRules.filter((x) => x.id !== r.id); renderAll(); },
+            }),
+            fswitch(r.enabled, (v) => { r.enabled = v; renderAll(); }, { ariaLabel: "Enable rule " + r.label }))))) : null,
+      el("div.x-addarea", null,
+        el("div.x-addrow", null,
+          fselect({
+            key: "cfg-recordhost", value: d.recordHost, ariaLabel: "Host to record", style: { flex: "1", minWidth: "0" },
+            options: [{ value: "", label: "on host…" }].concat(c.mitmHosts.map((h) => ({ value: h.id, label: h.label }))),
+            onchange: (v) => { d.recordHost = v; renderAll(); },
           }),
-          fswitch(r.enabled, (v) => { r.enabled = v; renderAll(); }, { ariaLabel: "Enable rule " + r.label }))))) : null,
-
-    el("div.x-addarea", null,
-      el("div.x-addrow", null,
-        fselect({
-          key: "cfg-recordhost", value: d.recordHost, ariaLabel: "Host to record", style: { flex: "1", minWidth: "0" },
-          options: [{ value: "", label: "on host…" }].concat(c.mitmHosts.map((h) => ({ value: h.id, label: h.label }))),
-          onchange: (v) => { d.recordHost = v; renderAll(); },
-        }),
-        finput({
-          key: "cfg-recordlabel", value: d.recordLabel, placeholder: "label (Category)", style: { width: "120px" },
-          oninput: (v) => { d.recordLabel = v; d.recordError = ""; renderAll(); },
-        })),
-      el("div.x-addrow", null,
-        kindToggle(["url-substring", "regex"], d.recordKind, (m) => { d.recordKind = m; renderAll(); }, { ariaLabel: "Match kind" }),
-        finput({
-          key: "cfg-recordvalue", value: d.recordValue, style: { flex: "1" },
-          placeholder: d.recordKind === "regex" ? "url regex…  e.g. /items$" : "url substring…  e.g. /live/items",
-          oninput: (v) => { d.recordValue = v; d.recordError = ""; renderAll(); },
-          onkeydown: (e) => { if (e.key === "Enter") addRule(); },
-        }),
-        fbtn({ size: "sm", icon: ICON.addSm, label: "Add", disabled: !d.recordLabel.trim() || !d.recordHost, onclick: addRule }))),
-    d.recordError ? el("span.x-err", null, d.recordError) : null,
+          finput({
+            key: "cfg-recordlabel", value: d.recordLabel, placeholder: "label (Category)", style: { width: "120px" },
+            oninput: (v) => { d.recordLabel = v; d.recordError = ""; renderAll(); },
+          })),
+        el("div.x-addrow", null,
+          kindToggle(["url-substring", "regex"], d.recordKind, (m) => { d.recordKind = m; renderAll(); }, { ariaLabel: "Match kind" }),
+          finput({
+            key: "cfg-recordvalue", value: d.recordValue, style: { flex: "1" },
+            placeholder: d.recordKind === "regex" ? "url regex…  e.g. /items$" : "url substring…  e.g. /live/items",
+            oninput: (v) => { d.recordValue = v; d.recordError = ""; renderAll(); },
+            onkeydown: (e) => { if (e.key === "Enter") addRule(); },
+          }),
+          fbtn({ size: "sm", icon: ICON.addSm, label: "Add", disabled: !d.recordLabel.trim() || !d.recordHost, onclick: addRule }))),
+      d.recordError ? el("span.x-err", null, d.recordError) : null,
+    ] : null,
 
     el("hr.f-divider"),
 
     /* ── CHAOS ── */
-    el("div.x-cfghdr", null,
-      el("span.x-cfglabel", null, "Chaos — fault injection"),
-      attachTip(el("span.x-info", { html: ICON.info, tabindex: "0", "aria-label": "About chaos fault injection" }), CHAOS_NOTICE),
+    sectionHeader("chaos", "Chaos — fault injection", CHAOS_NOTICE,
       el("div", { style: { marginLeft: "auto", display: "flex", alignItems: "center" } },
         fswitch(!!c.chaosEnabled, (v) => { c.chaosEnabled = v; renderAll(); }, {
           armed: true, ariaLabel: "Arm chaos",
@@ -2598,17 +3052,18 @@ OVERLAYS.capture = () => {
             : "Off — nothing fires until you arm. Configure faults below, then arm. Click to arm.",
         }))),
 
-    c.faultRules.length ? el("div.x-rulelist", null, c.faultRules.map((f) =>
-      el("div.x-rulerow", null,
-        el("span.x-rulevalue", { title: faultSummary(f) }, faultSummary(f)),
-        el("div.x-listctl", null,
-          fbtn({
-            icon: ICON.dismiss, size: "sm", appearance: "subtle", tip: "Remove fault",
-            onclick: () => { c.faultRules = c.faultRules.filter((x) => x.id !== f.id); renderAll(); },
-          }),
-          fswitch(f.enabled, (v) => { f.enabled = v; renderAll(); }, { ariaLabel: "Enable fault" }))))) : null,
+    state.cfgOpen.chaos ? [
+      c.faultRules.length ? el("div.x-rulelist", null, c.faultRules.map((f) =>
+        el("div.x-rulerow", null,
+          el("span.x-rulevalue", { title: faultSummary(f) }, faultSummary(f)),
+          el("div.x-listctl", null,
+            fbtn({
+              icon: ICON.dismiss, size: "sm", appearance: "subtle", tip: "Remove fault",
+              onclick: () => { c.faultRules = c.faultRules.filter((x) => x.id !== f.id); renderAll(); },
+            }),
+            fswitch(f.enabled, (v) => { f.enabled = v; renderAll(); }, { ariaLabel: "Enable fault" }))))) : null,
 
-    el("div.x-chaoseditor", null,
+      el("div.x-chaoseditor", null,
       /* Match — which recorded requests to fault */
       el("div.x-chaosgroup", null,
         el("span.x-hint", null, "Only decrypted + recorded requests can be faulted. To fault something new, add it under Decrypt / Record above."),
@@ -2620,15 +3075,42 @@ OVERLAYS.capture = () => {
               onchange: (v) => { d.faultClass = v; renderAll(); },
             }),
             fbtn({
-              size: "sm", appearance: "subtle", label: "URL filter", className: "x-rightcol",
-              checked: d.showUrlContains, tip: "Only fault requests whose URL contains this text",
+              size: "sm", appearance: "subtle", label: "Filter by", className: "x-rightcol",
+              checked: d.showUrlContains, tip: "Only fault requests containing this text (choose where to look)",
               onclick: () => { d.showUrlContains = !d.showUrlContains; renderAll(); },
             })),
           el("div", { class: "x-urlreveal" + (d.showUrlContains ? " open" : ""), "aria-hidden": String(!d.showUrlContains) },
-            finput({
-              key: "cfg-faulturl", value: d.faultUrl, placeholder: "url contains…", className: "x-fullwidth",
-              oninput: (v) => { d.faultUrl = v; renderAll(); },
-            }))),
+            el("div.x-chaosfield", null,
+              finput({
+                key: "cfg-faulturl", value: d.faultUrl, style: { flex: "1", minWidth: "0" },
+                placeholder: d.filterNegate ? "does not contain…" : "contains…",
+                oninput: (v) => { d.faultUrl = v; renderAll(); },
+                // Inside the box rather than beside it: the row already spends its
+                // width on the value and the three scope segments.
+                contentBefore: attachTip(el("button", {
+                  class: "x-kindbtn x-negbtn" + (d.filterNegate ? " active" : ""),
+                  type: "button", "aria-pressed": String(d.filterNegate),
+                  "aria-label": "Fault requests that do NOT contain this text",
+                  onclick: () => { d.filterNegate = !d.filterNegate; renderAll(); },
+                }, "!"), FILTER_NEGATE_HINT),
+              }),
+              // Multi-select, unlike the single-select legs below: any selected scope may match.
+              el("div.x-kindtoggle", { role: "group", "aria-label": "Search in — any selected scope may match" },
+                FAULT_MATCH_SCOPES.map((scope) => {
+                  const on = d.filterScopes.includes(scope);
+                  const last = on && d.filterScopes.length === 1;
+                  return el("button", {
+                    class: "x-kindbtn x-scopeseg" + (on ? " active" : ""),
+                    type: "button", "aria-pressed": String(on), "aria-disabled": last ? "true" : null,
+                    title: last ? "Keep at least one — collapse Filter by to remove the narrowing" : SCOPE_INFO[scope],
+                    onclick: () => {
+                      if (last) return;
+                      d.filterScopes = on ? d.filterScopes.filter((x) => x !== scope) : d.filterScopes.concat([scope]);
+                      renderAll();
+                    },
+                  }, el("span.x-reserve", null, el("span", null, scope), el("span.ghost", { "aria-hidden": "true" }, scope)));
+                })))),
+        ),
         el("div.x-chaosfield", null,
           methodPicker(d),
           finput({
@@ -2721,6 +3203,7 @@ OVERLAYS.capture = () => {
           size: "sm", icon: ICON.addSm, label: "Add fault", disabled: draftInvalid,
           onclick: () => { c.faultRules = c.faultRules.concat([composeDraftRule()]); resetFaultDraft(); renderAll(); },
         }))),
+    ] : null,
 
     el("hr.f-divider"),
 
@@ -3061,10 +3544,12 @@ OVERLAYS.rowmenu = (o) => {
     m.appendChild(menuItem("Remove this marker", () => { removeMarker(row.id); closeOverlay(); }));
   } else {
     m.appendChild(menuItem("Insert marker here", () => { insertMarkerAtRow(row.id); closeOverlay(); }));
-    if (row.kind === "log") {
+    const actions = muteActionsForRow(row);
+    if (actions.length) {
       m.appendChild(el("div.x-menudivider"));
-      m.appendChild(menuItem("Mute this tag", () => { addMuteRule({ kind: "tag", value: row.eventTag || row.eventIdHex }); closeOverlay(); }));
-      m.appendChild(menuItem("Mute this message", () => { addMuteRule({ kind: "regex", value: escapeRegex(row.message) }); closeOverlay(); }));
+      for (const a of actions) {
+        m.appendChild(menuItem(a.label, () => { addMuteRule(a.rule); closeOverlay(); }));
+      }
     }
   }
   return m;
@@ -3104,18 +3589,21 @@ function renderEmptyState() {
 function renderFilteredHint() {
   const active = [];
   if (state.rowKindFilter !== "both") {
-    active.push({ label: "Showing " + (state.rowKindFilter === "logs" ? "Logs" : "Network") + " only", clear: () => { state.rowKindFilter = "both"; renderAll(); } });
+    active.push({ key: "kind", label: "Showing " + (state.rowKindFilter === "logs" ? "Logs" : "Network") + " only", clear: () => { state.rowKindFilter = "both"; renderAll(); } });
   }
   if (state.searchMode === "filter" && state.searchText) {
-    active.push({ label: "Filter: “" + state.searchText + "”", clear: () => { state.searchText = ""; renderAll(); } });
+    active.push({ key: "search", label: "Filter: “" + state.searchText + "”", clear: () => { state.searchText = ""; renderAll(); } });
   }
   if (state.muteRules.length) {
-    active.push({ label: "Always-hide: " + state.muteRules.length, clear: () => { state.muteRules = []; renderAll(); } });
+    active.push({ key: "mute", label: "Mute: " + state.muteRules.length, clear: () => { state.muteRules = []; renderAll(); } });
   }
   if (state.spanZoom) {
-    active.push({ label: "Span", clear: () => { state.spanZoom = false; renderAll(); } });
+    active.push({ key: "span", label: "Span", clear: () => { state.spanZoom = false; renderAll(); } });
   }
   const hiddenKind = state.rowKindFilter === "logs" ? "Network" : "Log";
+  // Mute is global, not part of this tab's view, so it doesn't count towards
+  // offering the tab-scoped reset.
+  const tabScoped = active.filter((a) => a.key !== "mute").length;
 
   return el("div.x-filteredhint", null,
     el("div.heading", null, active.length ? "No rows match the current view" : "No rows to show"),
@@ -3123,7 +3611,7 @@ function renderFilteredHint() {
       el("div.sub", null, "These filters are hiding rows — clear any to bring them back:"),
       el("div.x-chips", null, active.map((a) =>
         el("button.x-chip", { type: "button", onclick: a.clear }, a.label, el("span.xx", null, "✕")))),
-      active.length > 1 ? el("button.x-reset", { type: "button", onclick: clearViewFilters }, "Reset all view filters") : null,
+      tabScoped > 1 ? el("button.x-reset", { type: "button", onclick: clearViewFilters }, "Reset tab view") : null,
       state.rowKindFilter !== "both"
         ? el("div.x-note", null, hiddenKind + " rows are hidden by this filter. If rows you expect still don’t appear, they may not be recorded — check ", el("strong", null, "Capture"), ".")
         : null,
@@ -3347,7 +3835,7 @@ function renderLogBody(row) {
   const f = detectMessageFormat(row.message);
   const pretty = f.kind === "plain" ? row.message : prettyJson(f.value);
 
-  return el("div.x-detailbody", null,
+  return el("div.x-detailbody", { "data-scroll": "detail:" + row.id },
     el("div.x-field", null,
       el("span.x-label", null, "Time"), copyable(formatDateTime(row.timestamp), undefined, "x-value"),
       el("span.x-label", null, "Level"),
@@ -3396,7 +3884,40 @@ function renderNetworkBody(row) {
   const st = statusStyle(row.status);
   const reqCt = row.requestHeaders["content-type"] || "";
 
-  return el("div.x-detailbody", null,
+  // An undecrypted row records a handshake, not an exchange: there is no status,
+  // path, header set or body to show, so the panel says so instead of rendering
+  // a page of empty sections.
+  if (row.undecrypted) {
+    return el("div.x-detailbody", { "data-scroll": "detail:" + row.id },
+      el("div.x-field", null,
+        el("span.x-label", null, "Category"), copyable(row.netClass, undefined, "x-value"),
+        el("span.x-label", null, "Host"), copyable(row.hostname, undefined, "x-value"),
+        el("span.x-label", null, "Method"), copyable(row.method, undefined, "x-value"),
+        el("span.x-label", null, "Time"), copyable(formatDateTime(row.timestamp), undefined, "x-value")),
+      el("div.x-sectiontitle", null, el("span", null, "Not decrypted")),
+      el("div.x-hint", { style: { lineHeight: "1.5" } },
+        "This host isn’t in the Decrypt list, so the proxy tunnelled the connection without opening it. ",
+        "The TLS handshake gives us the hostname and nothing else — no method, URL, status or body. ",
+        "One row per connection, so requests reusing an already-open connection produce none."),
+      el("div.x-muterow", null,
+        fbtn({
+          size: "sm", icon: ICON.addSm, label: "Decrypt this host",
+          tip: "Add " + row.hostname + " to Decrypt (applies on the next Start)",
+          onclick: () => {
+            const c = state.config;
+            if (c.mitmHosts.some((h) => h.hostnames.includes(row.hostname))) { showToast("Already listed"); return; }
+            c.mitmHosts = c.mitmHosts.concat([{ id: "u-" + hex(6), label: row.hostname, hostnames: [row.hostname], enabled: true, builtin: false }]);
+            showToast("Added to Decrypt");
+            renderAll();
+          },
+        }),
+        fbtn({
+          size: "sm", appearance: "subtle", icon: ICON.eyeOff, label: "Mute this category",
+          onclick: () => addMuteRule({ kind: "category", value: row.netClass }),
+        })));
+  }
+
+  return el("div.x-detailbody", { "data-scroll": "detail:" + row.id },
     row.fault ? el("div.x-chaosbanner", null,
       el("span.x-chaostitle", null, "⚡ Chaos"),
       el("span.x-chaosnote", null, row.fault.note),
@@ -3662,10 +4183,14 @@ function closeDocument(id) {
 let lastTabClick = { id: null, t: 0 };
 
 function renderTabStrip() {
-  const list = el("div.x-tablist");  for (const doc of state.documents) {
+  const list = el("div.x-tablist", { role: "tablist", "aria-label": "Capture tabs" });
+  state.documents.forEach((doc, index) => {
     const active = doc.id === state.activeDocumentId;
     const isLive = state.capture.liveDocumentId === doc.id;
     const count = dataRowCount(doc);
+    const runs = doc.runs.length;
+    const tooltip = doc.title + " · Tab " + (index + 1) + " · " + count.toLocaleString() + " rows · "
+      + runs.toLocaleString() + " " + (runs === 1 ? "run" : "runs");
 
     if (state.tabRename && state.tabRename.id === doc.id) {
       list.appendChild(el("div", { class: "x-tabshell" + (active ? " active" : "") },
@@ -3673,19 +4198,23 @@ function renderTabStrip() {
           el("input.x-renameinput", {
             "data-k": "tab-rename", value: state.tabRename.value,
             oninput: (e) => { state.tabRename.value = e.target.value; },
-            onblur: () => commitRename(),
+            // Only a real user blur commits. A rebuild (streaming re-renders run
+            // several times a second) tears this node out and fires blur too,
+            // which would otherwise close the rename box mid-edit.
+            onblur: () => { if (!isRendering) commitRename(); },
             onkeydown: (e) => {
               if (e.key === "Enter") { e.preventDefault(); commitRename(); }
               if (e.key === "Escape") { e.preventDefault(); state.tabRename = undefined; renderAll(); }
             },
           }))));
-      continue;
+      return;
     }
 
     const shell = el("div", { class: "x-tabshell" + (active ? " active" : "") },
       el("button.x-tabbtn", {
         type: "button", "data-tab": doc.id, tabindex: active ? "0" : "-1",
-        title: doc.title + " · " + count.toLocaleString() + " rows",
+        role: "tab", "aria-selected": String(active),
+        title: tooltip,
         // Double-click is detected by timestamp rather than the dblclick event:
         // selecting a tab re-renders the strip, so the second click would land on
         // a brand-new node and dblclick would never fire.
@@ -3703,14 +4232,22 @@ function renderTabStrip() {
         oncontextmenu: (e) => { e.preventDefault(); openOverlay("tabmenu", { left: e.clientX, right: e.clientX, top: e.clientY, bottom: e.clientY, width: 0, height: 0 }, { docId: doc.id, align: "start" }); },
         onkeydown: (e) => onTabKey(e, doc),
       },
-        el("span", {
-          class: "x-tabicon" + (isLive ? " live" : "") + (doc.status === "error" ? " err" : ""),
-          html: doc.kind === "har" ? ICON.doc : ICON.record,
-        }),
+        // The emoji in an automatic title is the tab's identity, so a plain
+        // capture tab carries no icon: only HAR (document), live (green record
+        // dot) and error (red !) states add one.
+        doc.kind === "har"
+          ? el("span.x-tabicon", { html: ICON.doc })
+          : doc.status === "live"
+            ? el("span.x-tabicon.live", { html: ICON.record })
+            : doc.status === "error"
+              ? el("span.x-tabicon.err", { "aria-hidden": "true" }, "!")
+              : null,
         el("span.x-tabtitle", null, doc.title),
-        count ? el("span.x-tabcount", null, count.toLocaleString()) : null));
+        // The count is a background-activity hint — shown only while another tab
+        // is the live one and has rows.
+        isLive && !active && count > 0 ? el("span.x-tabcount", null, count.toLocaleString()) : null));
     list.appendChild(shell);
-  }
+  });
 
   return el("div.x-tabstrip", null,
     el("div.x-tabviewport", null, list),
@@ -3739,7 +4276,8 @@ function commitRename() {
   if (doc) {
     const v = r.value.trim();
     if (v) { doc.title = v; doc.autoTitle = false; }
-    else if (doc.autoNumber) { doc.title = "Capture " + doc.autoNumber; doc.autoTitle = true; }
+    // Saving a blank name restores the tab's automatic animal title.
+    else if (doc.autoName) { doc.title = doc.autoName; doc.autoTitle = true; }
   }
   renderAll();
 }

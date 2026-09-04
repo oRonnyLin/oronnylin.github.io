@@ -23,7 +23,7 @@ It works from `file://` too, so you can double-click the file to try it locally.
 Everything the user *touches* is real: the interactions, layout, state transitions, and visual design are ported directly from the app's renderer. Everything the app would *fetch* is fake.
 
 - **No proxy, no capture, no network.** "Start" runs a generator that emits synthetic rows on a timer.
-- **All identifiers are invented.** Hosts (`liveapp.contoso.com`, `res-*.cdn.contoso.net`, `*-media.contoso.io`, `*.contoso-drive.com`), the six network classes (`Thumbnail`, `Session`, `Items`, `Asset`, `Media`, `Embed`), ULS tags, categories, sources and log messages are all fictional. No internal endpoint or telemetry appears anywhere in this file.
+- **All identifiers are invented.** Hosts (`liveapp.contoso.com`, `res-*.cdn.contoso.net`, `*-media.contoso.io`, `*.contoso-drive.com`), the eight network classes (`Thumbnail`, `Session`, `Items`, `Asset`, `Media`, `Embed`, `Embed assets`, `Contoso Calling`), ULS tags, categories, sources and log messages are all fictional. No internal endpoint or telemetry appears anywhere in this file.
 - **Export JSON** downloads the synthetic rows currently in the tab.
 - **Zoom** emulates the Electron window zoom with CSS `zoom`.
 
@@ -32,7 +32,7 @@ Everything the user *touches* is real: the interactions, layout, state transitio
 | Area | Interactions |
 |---|---|
 | **Capture** | Start / Stop / Continue (a second run inserts a `Run N · continued` divider), Clear |
-| **Capture config** (gear) | Toggle ULS logs; toggle or remove decrypt hosts; add a domain (with or without a Record entry); toggle the six built-in classes; add a custom Record rule (substring or regex); build and arm a chaos fault; Test a URL |
+| **Capture config** (gear) | Toggle ULS logs; toggle or remove decrypt hosts; show undecrypted hosts as discovery rows; add a domain (with or without a Record entry); toggle the eight built-in classes; add a custom Record rule (substring or regex); build and arm a chaos fault; Test a URL |
 | **Chaos** | Arm the ⚡ switch, attach a fault to a Category, narrow by URL / method / probability / delay, choose a request leg (block or forward, with url / header / body edits) and a response leg (drop or respond, with status / header / body edits). Faulted rows get a ⚡ banner and keep the real upstream response for comparison. |
 | **Table** | Click a row to inspect it; sort by clicking a header (disabled while capturing); drag a column edge to resize; show/hide columns; scroll sideways with the dock scrollbar or Shift+wheel; scroll up to pause the live tail and click **↓ Live** to resume |
 | **Filtering** | `Logs / Both / Network`; the search box toggles between **Filter** (hides non-matches) and **Find** (highlights, with `n / m` stepping); the eye-off **Mute** popover hides noisy rows by tag or message regex |
