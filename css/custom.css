@@ -429,6 +429,12 @@ a:focus-visible {
 	outline-offset: 2px;
 }
 
+/* The template flanks the hero name with two short white bars. */
+#fh5co-header .display-tc h1 span:before,
+#fh5co-header .display-tc h1 span:after {
+	content: none;
+}
+
 /* --- Hero entrance ---------------------------------------------------------
    Replaces the template's all-at-once .animate-box fade on the hero.
    Sequence: photo + name rise -> role line types itself (inline script in
