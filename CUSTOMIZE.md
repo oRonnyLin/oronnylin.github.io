@@ -32,14 +32,26 @@ Tiles are four per row (`col-md-3`); use `col-md-4` for three, `col-md-6` for tw
 
 ## Using a screenshot instead of a flat tile
 
-Drop the image in `images/`, then remove `work--flat` and add the background:
+Drop the image in `images/` (downscale with `sips -Z 900` or so first — a
+tile is small, no need for the original resolution — and prefer JPEG at
+~85 quality if that lands well under ~250KB without wrecking any UI text in
+the shot). Swap `work--flat` for `work--preview` and add the background:
 
 ```html
-<a href="..." class="work" style="background-image: url(images/my-project.jpg);">
+<a href="..." class="work work--preview work--link" style="background-image: url(images/my-project.jpg);">
 ```
 
-Note the template hides the caption until hover on desktop for photo tiles —
-that's why the no-image tiles use `work--flat`, which keeps the text visible.
+(Drop `work--link` for a tile with no link — use `<div>` instead of `<a>`,
+same as a flat tile.)
+
+The template hides a photo tile's caption until hover
+(`style.css:729` — fine when there's nothing else covering the image), which
+is wrong for a preview: `work--preview` keeps the caption visible always,
+same as `work--flat`, but dims the image underneath with `--tile-overlay`
+(defined in `css/custom.css`) so the text stays readable on top. See the
+`.work--preview` block in `css/custom.css` for the contrast math behind that
+overlay's opacity — if a new screenshot is unusually dark, re-check the
+numbers there still clear 4.5:1.
 
 ## Adding a job or degree
 

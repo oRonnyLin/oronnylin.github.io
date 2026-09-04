@@ -2302,7 +2302,7 @@ function renderRibbon() {
   if (state.ribbonDismissed) return null;
   return el("div.x-demoribbon", null,
     el("span", null, el("b", null, "Interactive UI demo"), " — no backend. ",
-      "Press ", el("b", null, "Start"), " to stream synthetic rows; every host, tag and message is fictional."),
+      "Press ", el("b", null, "Start"), " to stream synthetic rows"),
     el("span.spacer"),
     el("button", { type: "button", onclick: () => { state.ribbonDismissed = true; renderAll(); } }, "Dismiss"));
 }

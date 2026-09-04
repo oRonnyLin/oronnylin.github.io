@@ -20,6 +20,7 @@
 	--ink:           #26332F;              /* warm green-charcoal for text on wash */
 	--ink-muted:     #52635D;
 	--tile:          #2E3F3A;              /* project tile background */
+	--tile-overlay:  rgba(46, 63, 58, .85); /* --tile at .85 alpha: scrim over screenshot preview tiles */
 	--hero-overlay:  rgba(58, 110, 102, .88);
 }
 
@@ -201,6 +202,64 @@
 }
 
 .work--flat .desc span i {
+	margin-left: 4px;
+	font-size: 11px;
+}
+
+/* --- Work tiles with a screenshot preview ----------------------------------
+   For a tile where a screenshot exists: show it as the background, but wash
+   it with a translucent scrim (--tile-overlay) so the caption reads on top
+   -- same idea as the hero's --hero-overlay over the cover photo. Unlike a
+   bare .work tile, which hides its caption until hover (style.css:729,
+   meant for a photo with nothing covering it), this caption stays visible
+   always: it's a preview, not a reveal.
+
+   Contrast, worst case (the screenshot's palest pixel, pure white, sitting
+   directly behind the scrim):
+     title, #fff on --tile-overlay ................ 7.04:1
+     subtitle, rgba(255,255,255,.75) on same ....... 4.82:1
+   Both clear WCAG AA (4.5:1 normal text). Real screenshots run darker than
+   pure white almost everywhere, so this is a floor, not the typical case.
+
+   Usage: swap work--flat for work--preview and add the background:
+     <a class="work work--preview work--link" style="background-image: url(images/x.jpg);">
+   (or a <div class="work work--preview"> if the tile has no link.) */
+
+.work--preview {
+	position: relative;
+}
+
+.work--preview::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: var(--tile-overlay);
+	z-index: 1;
+}
+
+.work--preview .desc {
+	position: relative;
+	z-index: 2;
+	opacity: 1;
+	background: transparent;
+}
+
+.work--preview .desc h3 {
+	color: #fff;
+	-webkit-transform: none;
+	transform: none;
+	margin-bottom: 8px;
+	line-height: 1.3;
+}
+
+.work--preview .desc span {
+	color: rgba(255, 255, 255, .75);
+	-webkit-transform: none;
+	transform: none;
+	font-size: 13px;
+}
+
+.work--preview .desc span i {
 	margin-left: 4px;
 	font-size: 11px;
 }
