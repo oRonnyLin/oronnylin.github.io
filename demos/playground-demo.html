@@ -1,0 +1,2855 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Slidecast Live Playground — interactive UI demo</title>
+<!--
+  Slidecast Live Playground — static UI demo.
+
+  A self-contained, client-only reproduction of an internal bootstrapper
+  playground's interface. No backend, no network, no build step: every slide,
+  log line, file and identifier is generated in the browser, and all hosts,
+  endpoints, service names, feature-gate names and product names are invented
+  ("Contoso Apps", "Slidecast", "Northwind Meet", "Relay"). Drop it anywhere
+  and embed it with:
+
+      <iframe src="playground-demo.html" style="width:100%;height:760px;border:0"></iframe>
+
+  Everything below is vanilla HTML/CSS/JS — no framework, no bundler.
+-->
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   Design tokens — Fluent UI v9 webLightTheme, read from the theme package so
+   the demo matches the real app's palette exactly rather than approximately.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --bg1: #ffffff;
+  --bg1Hover: #f5f5f5;
+  --bg2: #fafafa;
+  --bg3: #f5f5f5;
+  --bg3Hover: #ebebeb;
+  --bg4: #f0f0f0;
+  --bg5: #ebebeb;
+  --bg6: #e6e6e6;
+  --bgDisabled: #f0f0f0;
+
+  --fg1: #242424;
+  --fg2: #424242;
+  --fg3: #616161;
+  --fg4: #707070;
+  --fgDisabled: #bdbdbd;
+  --fgOnBrand: #ffffff;
+
+  --stroke1: #d1d1d1;
+  --stroke2: #e0e0e0;
+  --stroke3: #f0f0f0;
+  --strokeAccessible: #616161;
+
+  --brandBg: #0f6cbd;
+  --brandBgHover: #115ea3;
+  --brandBg2: #ebf3fc;
+  --brandFg1: #0f6cbd;
+  --brandStroke1: #0f6cbd;
+
+  --subtleHover: #f5f5f5;
+  --subtlePressed: #e0e0e0;
+
+  --r-sm: 2px;
+  --r-md: 4px;
+  --r-lg: 6px;
+  --r-circ: 10000px;
+
+  --shadow4: 0 0 2px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.14);
+  --shadow8: 0 0 2px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.14);
+  --shadow16: 0 0 2px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.14);
+
+  --font: 'Segoe UI', 'Segoe UI Web (West European)', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif;
+  --mono: 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
+
+  --fs200: 12px;
+  --fs300: 14px;
+  --fs400: 16px;
+  --fwReg: 400;
+  --fwSemi: 600;
+  --fwBold: 700;
+
+  /* Step-flow status palette — literal constants in the source, not tokens. */
+  --doneBg: #e8f5e9;
+  --doneFg: #2e7d32;
+  --activeBg: #e3f2fd;
+  --activeFg: #1565c0;
+
+  /* Instance accents. */
+  --presenter: #e65100;
+  --presenterBg: #fff3e0;
+  --attendee: #00695c;
+  --attendeeBg: #e0f2f1;
+
+  /* Log levels + destructive actions. */
+  --logError: #c62828;
+  --logWarn: #f57f17;
+  --logEvent: #1565c0;
+  --stopBg: #fbe9e7;
+  --stopBgHover: #ffccbc;
+  --dotBooted: #2e7d32;
+  --dotPending: #f9a825;
+}
+
+/* ── reset ────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font);
+  font-size: var(--fs300);
+  color: var(--fg1);
+  background: var(--bg2);
+  -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; }
+
+/* Scrollbars. `::-webkit-scrollbar` is Chromium/WebKit only, so the standard
+   `scrollbar-width`/`scrollbar-color` pair is declared alongside it — without
+   that, Firefox falls back to default full-width bars. */
+* { scrollbar-width: thin; scrollbar-color: #c8c8c8 transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: #c8c8c8; border-radius: var(--r-circ); border: 3px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: #a6a6a6; background-clip: content-box; }
+*::-webkit-scrollbar-corner { background: transparent; }
+
+/* ═══ app shell ════════════════════════════════════════════════════════════ */
+#app { display: flex; flex-direction: column; height: 100vh; background: var(--bg2); }
+
+/* ═══ top bar ══════════════════════════════════════════════════════════════ */
+.x-topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--stroke2);
+  background: var(--bg1);
+  flex-shrink: 0;
+}
+.x-title {
+  font-size: 15px; font-weight: var(--fwBold); color: var(--fg1);
+  white-space: nowrap; letter-spacing: -0.2px;
+}
+.x-steparea { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+
+/* ── step flow bar ── */
+.x-stepbar { display: flex; align-items: center; gap: 4px; padding: 6px 0; user-select: none; }
+.x-step {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 16px;
+  font-size: 12px; font-weight: var(--fwSemi); line-height: 20px;
+  white-space: nowrap; border: none;
+  transition: background-color .15s, color .15s, box-shadow .15s;
+}
+.x-step.pending, .x-step.muted { background: var(--bg3); color: var(--fg3); }
+.x-step.ready, .x-step.active  { background: var(--activeBg); color: var(--activeFg); }
+.x-step.done                   { background: var(--doneBg);  color: var(--doneFg); }
+.x-step.clickable { cursor: pointer; }
+.x-step.clickable:hover { box-shadow: 0 0 0 1.5px currentColor; }
+.x-step:focus-visible { outline: 2px solid var(--brandStroke1); outline-offset: 1px; }
+.x-stepdetail {
+  font-weight: var(--fwReg); font-size: 11px; opacity: .85;
+  max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.x-connector { color: var(--fg4); font-size: 10px; padding: 0 2px; line-height: 20px; }
+.x-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  font-size: 10px; font-weight: var(--fwBold); line-height: 1; flex-shrink: 0;
+}
+.x-num.numPending { background: var(--bg5); color: var(--fg3); }
+.x-num.numActive  { background: var(--activeFg); color: #fff; }
+.x-num.numDone    { background: var(--doneFg); color: #fff; }
+
+/* Fluent Spinner, extra-tiny — used as the "active" step indicator. */
+.x-spinner {
+  width: 16px; height: 16px; flex-shrink: 0;
+  border: 1.5px solid var(--brandBg2);
+  border-top-color: var(--brandBg);
+  border-radius: 50%;
+  animation: x-spin .9s linear infinite;
+}
+@keyframes x-spin { to { transform: rotate(360deg); } }
+
+/* ── "─ or ─" separator ── */
+.x-orsep { display: flex; align-items: center; gap: 6px; flex-shrink: 0; user-select: none; }
+.x-orline { width: 14px; height: 1px; background: var(--stroke2); }
+.x-ortext {
+  font-size: 11px; color: var(--fg3); font-weight: var(--fwSemi);
+  letter-spacing: .3px; line-height: 1; text-transform: lowercase;
+}
+
+/* ── relay-URL chip (visually parallel to the step pills) ── */
+.x-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 16px;
+  font-size: 12px; font-weight: var(--fwSemi); line-height: 20px;
+  white-space: nowrap; cursor: pointer; border: none;
+  background: var(--activeBg); color: var(--activeFg);
+  transition: box-shadow .15s, background-color .15s, color .15s;
+}
+.x-chip:hover:not(:disabled) { box-shadow: 0 0 0 1.5px currentColor; }
+.x-chip:focus-visible { outline: 2px solid var(--brandStroke1); outline-offset: 1px; }
+.x-chip:disabled { opacity: .5; cursor: default; }
+.x-chip.set { background: var(--doneBg); color: var(--doneFg); }
+.x-chipmarker {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  font-size: 10px; font-weight: var(--fwBold); line-height: 1; flex-shrink: 0;
+  background: var(--activeFg); color: #fff;
+}
+.x-chip.set .x-chipmarker { background: var(--doneFg); }
+
+/* ── account + mode toggle ── */
+.x-account { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.x-accountname {
+  font-size: 12px; color: var(--fg3); max-width: 200px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.x-modetoggle {
+  display: flex; border-radius: var(--r-lg); overflow: hidden;
+  border: 1px solid var(--stroke2); flex-shrink: 0;
+}
+.x-modebtn {
+  padding: 3px 12px; font-size: 12px; font-weight: var(--fwSemi);
+  border: none; cursor: pointer;
+  transition: background-color .15s, color .15s;
+  background: var(--bg1); color: var(--fg3);
+}
+.x-modebtn:hover { background: var(--bg3); }
+.x-modebtn.active { background: var(--bg5); color: var(--fg1); }
+.x-modebtn:focus-visible { outline: 2px solid var(--brandStroke1); outline-offset: -2px; }
+
+/* ═══ body ═════════════════════════════════════════════════════════════════ */
+.x-body { display: flex; flex: 1; overflow: hidden; }
+
+/* ── params drawer ── */
+.x-drawerwrap {
+  display: flex; flex-shrink: 0; height: 100%; overflow: hidden;
+  transition: width .2s ease; width: 0;
+}
+.x-drawerwrap.open { width: 420px; }
+.x-drawerbody {
+  width: 420px; display: flex; flex-direction: column; overflow: hidden;
+  border-right: 1px solid var(--stroke2); background: var(--bg1);
+  transition: transform .2s ease; transform: translateX(-420px);
+}
+.x-drawerwrap.open .x-drawerbody { transform: translateX(0); }
+.x-drawerhead {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-bottom: 1px solid var(--stroke2); flex-shrink: 0;
+}
+.x-drawertitle { font-size: var(--fs300); font-weight: var(--fwSemi); color: var(--fg1); }
+.x-drawercontent { flex: 1; overflow-y: auto; padding: 8px 12px 12px; }
+.x-handle {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; flex-shrink: 0; cursor: pointer;
+  background: var(--bg3); transition: background-color .15s; user-select: none;
+  border: none; padding: 0;
+}
+.x-handle:hover { background: var(--bg3Hover); }
+.x-handle:focus-visible { outline: 2px solid var(--brandStroke1); outline-offset: -2px; }
+.x-handleicon { font-size: 12px; color: var(--fg3); }
+
+/* ── instance area ── */
+.x-instancearea { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 8px 12px; }
+.x-dualactions { display: flex; align-items: center; gap: 8px; padding-bottom: 6px; flex-shrink: 0; }
+.x-instancesrow { display: flex; flex: 1; overflow: hidden; }
+.x-instancecol { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.x-routingarrow {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; flex-shrink: 0; color: var(--fg4); font-size: 14px; user-select: none;
+}
+
+/* ── instance card ── */
+.x-card {
+  display: flex; flex-direction: column; flex: 1; min-width: 0; overflow: hidden;
+  border-radius: var(--r-md); border: 1px solid var(--stroke2); background: var(--bg1);
+}
+.x-card.presenter { border-left: 3px solid var(--presenter); }
+.x-card.attendee  { border-left: 3px solid var(--attendee); }
+.x-bare { display: flex; flex-direction: column; flex: 1; min-width: 0; overflow: hidden; }
+
+.x-cardhead {
+  display: flex; gap: 8px; align-items: center;
+  padding: 8px 12px; border-bottom: 1px solid var(--stroke2); flex-shrink: 0;
+}
+.x-cardhead.bare { padding: 4px 0; border-bottom: none; }
+
+.x-statusdot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--fg4); }
+.x-statusdot.booted  { background: var(--dotBooted); }
+.x-statusdot.pending { background: var(--dotPending); }
+
+.x-rolebadge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 10px; border-radius: 12px;
+  font-size: 12px; font-weight: var(--fwSemi);
+  cursor: pointer; transition: box-shadow .15s; user-select: none; border: none;
+}
+.x-rolebadge:hover { box-shadow: 0 0 0 1px currentColor; }
+.x-rolebadge:focus-visible { outline: 2px solid var(--brandStroke1); outline-offset: 1px; }
+.x-rolebadge.presenter { background: var(--presenterBg); color: var(--presenter); }
+.x-rolebadge.attendee  { background: var(--attendeeBg);  color: var(--attendee); }
+
+.x-configbar { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.x-pill {
+  font-size: 11px; color: var(--fg3); white-space: nowrap;
+  cursor: pointer; background: none; border: none; padding: 0;
+}
+.x-pill:focus-visible { outline: 2px solid var(--brandStroke1); outline-offset: 2px; }
+.x-pillsep { color: var(--fg4); font-size: 11px; }
+.x-gear { margin-left: 4px; font-size: 10px; }
+
+.x-cardactions { display: flex; gap: 2px; margin-left: auto; }
+
+.x-configpop { display: flex; flex-direction: column; gap: 12px; padding: 4px; min-width: 200px; }
+.x-configsection { display: flex; flex-direction: column; gap: 2px; }
+.x-configlabel {
+  font-size: 11px; font-weight: var(--fwSemi); color: var(--fg3);
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.x-confighint { font-size: 10px; color: var(--fg4); font-style: italic; margin-top: 2px; }
+
+/* ── viewer stage (stands in for the remote viewer iframe) ── */
+.x-stage { flex: 1; min-height: 200px; overflow: hidden; position: relative; }
+.x-stage.bare { border: 1px solid var(--stroke2); border-radius: var(--r-md); }
+
+.x-viewerbar { display: flex; gap: 4px; align-items: center; padding: 4px 12px 6px; flex-shrink: 0; flex-wrap: wrap; }
+.x-viewerbar.bare { padding: 4px 0 2px; }
+.x-gotogroup { display: flex; align-items: center; gap: 2px; }
+.x-viewersep { width: 1px; height: 16px; background: var(--stroke2); margin: 0 4px; flex-shrink: 0; }
+
+/* ═══ log panel ════════════════════════════════════════════════════════════ */
+.x-logsection { height: 200px; flex-shrink: 0; padding: 0 12px 8px; }
+.x-logpanel { display: flex; flex-direction: column; height: 100%; min-height: 120px; }
+.x-loghead {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; padding-bottom: 4px; flex-shrink: 0;
+}
+.x-logheadleft { display: flex; align-items: center; gap: 8px; }
+.x-logtitle { font-size: var(--fs300); font-weight: var(--fwSemi); color: var(--fg1); }
+.x-logcount { font-size: 11px; color: var(--fg3); font-weight: var(--fwReg); }
+.x-logarea {
+  flex: 1; overflow-y: auto; background: var(--bg3); border-radius: var(--r-md);
+  padding: 6px 8px; font-family: var(--mono); font-size: 11.5px; line-height: 18px;
+}
+.x-logentry { white-space: pre-wrap; word-break: break-all; padding: 1px 0; }
+.x-logentry.log   { color: var(--fg1); }
+.x-logentry.error { color: var(--logError); }
+.x-logentry.warn  { color: var(--logWarn); }
+.x-logentry.debug { color: var(--fg3); }
+.x-logentry.event { color: var(--logEvent); }
+.x-logts { color: var(--fg4); margin-right: 6px; font-size: 10.5px; }
+.x-logbadge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; border-radius: 3px;
+  font-size: 9px; font-weight: var(--fwBold); color: #fff;
+  margin-right: 6px; vertical-align: middle; line-height: 1;
+}
+.x-loglevel {
+  font-weight: var(--fwSemi); margin-right: 6px; text-transform: uppercase;
+  font-size: 10px; opacity: .7; min-width: 32px; display: inline-block;
+}
+.x-logempty { color: var(--fg4); font-style: italic; }
+</style>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   Fluent UI v9 component ports. Only the variants the app actually uses:
+   Button (small: primary / subtle), Input, Textarea, Switch, Radio, Field,
+   Accordion, TabList, Tooltip, PopoverSurface.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Button, size="small" ── */
+.x-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  min-width: 64px; height: 24px; padding: 0 8px;
+  font-size: var(--fs200); font-weight: var(--fwSemi); line-height: 1;
+  border-radius: var(--r-md); border: 1px solid var(--stroke1);
+  background: var(--bg1); color: var(--fg1);
+  cursor: pointer; white-space: nowrap;
+  transition: background-color .1s, color .1s, border-color .1s;
+}
+.x-btn:hover:not(:disabled) { background: var(--bg1Hover); }
+.x-btn:active:not(:disabled) { background: var(--subtlePressed); }
+.x-btn:focus-visible { outline: 2px solid var(--brandStroke1); outline-offset: 1px; }
+.x-btn:disabled { background: var(--bgDisabled); color: var(--fgDisabled); border-color: var(--stroke2); cursor: not-allowed; }
+
+.x-btn.primary { background: var(--brandBg); color: var(--fgOnBrand); border-color: transparent; }
+.x-btn.primary:hover:not(:disabled) { background: var(--brandBgHover); }
+.x-btn.primary:disabled { background: var(--bgDisabled); color: var(--fgDisabled); }
+
+.x-btn.subtle { background: transparent; color: var(--fg2); border-color: transparent; }
+.x-btn.subtle:hover:not(:disabled) { background: var(--subtleHover); color: var(--fg1); }
+.x-btn.subtle:disabled { background: transparent; color: var(--fgDisabled); }
+
+.x-btn.icon { min-width: 24px; padding: 0 4px; }
+.x-btn.stop { background: var(--stopBg); color: var(--logError); border-color: transparent; }
+.x-btn.stop:hover:not(:disabled) { background: var(--stopBgHover); }
+
+/* ── Input, size="small" ── */
+.x-inputwrap {
+  display: inline-flex; align-items: center; position: relative;
+  height: 24px; border-radius: var(--r-md);
+  background: var(--bg1);
+  border: 1px solid var(--stroke1); border-bottom-color: var(--strokeAccessible);
+}
+.x-inputwrap::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+  border-bottom: 2px solid var(--brandStroke1);
+  border-bottom-left-radius: var(--r-md); border-bottom-right-radius: var(--r-md);
+  transform: scaleX(0); transition: transform .1s ease;
+}
+.x-inputwrap:focus-within::after { transform: scaleX(1); }
+.x-inputwrap input {
+  flex: 1; min-width: 0; height: 100%; padding: 0 8px;
+  border: none; outline: none; background: transparent;
+  font-family: inherit; font-size: var(--fs200); color: var(--fg1);
+}
+.x-inputwrap input::placeholder { color: var(--fg4); }
+.x-inputwrap.disabled { background: var(--bgDisabled); border-color: var(--stroke2); }
+
+/* ── Textarea ── */
+.x-textarea {
+  width: 100%; border-radius: var(--r-md); background: var(--bg1);
+  border: 1px solid var(--stroke1); border-bottom-color: var(--strokeAccessible);
+  padding: 5px 8px; resize: vertical;
+  font-family: var(--mono); font-size: 11px; line-height: 16px; color: var(--fg1);
+  outline: none;
+}
+.x-textarea:focus { border-bottom: 2px solid var(--brandStroke1); padding-bottom: 4px; }
+
+/* ── Field ── */
+.x-field { display: flex; flex-direction: column; gap: 2px; padding: 2px 0; }
+.x-fieldlabel { font-size: var(--fs200); font-weight: var(--fwSemi); color: var(--fg1); line-height: 16px; }
+.x-fieldrow { display: flex; align-items: center; gap: 4px; }
+.x-fieldinput { flex: 1; min-width: 0; }
+.x-fieldinput .x-inputwrap { width: 100%; }
+
+/* ── Switch ── */
+.x-switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; padding: 2px 0; user-select: none; }
+.x-switchtrack {
+  position: relative; width: 40px; height: 20px; flex-shrink: 0;
+  border-radius: var(--r-circ); border: 1px solid var(--strokeAccessible);
+  background: transparent; transition: background-color .1s, border-color .1s;
+}
+.x-switchthumb {
+  position: absolute; top: 2px; left: 3px; width: 14px; height: 14px;
+  border-radius: 50%; background: var(--strokeAccessible);
+  transition: transform .1s ease, background-color .1s;
+}
+.x-switch.on .x-switchtrack { background: var(--brandBg); border-color: var(--brandBg); }
+.x-switch.on .x-switchthumb { background: #fff; transform: translateX(19px); }
+.x-switch:focus-visible { outline: 2px solid var(--brandStroke1); outline-offset: 2px; border-radius: var(--r-sm); }
+.x-switchlabel { font-size: var(--fs200); color: var(--fg1); }
+
+/* ── Radio ── */
+.x-radiogroup { display: flex; gap: 16px; padding: 2px 0; }
+.x-radiogroup.vertical { flex-direction: column; gap: 4px; }
+.x-radio { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+.x-radio.disabled { cursor: not-allowed; opacity: .5; }
+.x-radiomark {
+  position: relative; width: 16px; height: 16px; flex-shrink: 0;
+  border-radius: 50%; border: 1px solid var(--strokeAccessible); background: var(--bg1);
+  transition: border-color .1s;
+}
+.x-radio.on .x-radiomark { border-color: var(--brandBg); border-width: 1px; }
+.x-radio.on .x-radiomark::after {
+  content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--brandBg);
+}
+.x-radio:focus-visible { outline: 2px solid var(--brandStroke1); outline-offset: 2px; border-radius: var(--r-sm); }
+.x-radiolabel { font-size: var(--fs200); color: var(--fg1); }
+
+/* ── Accordion ── */
+.x-accitem { border-bottom: 1px solid var(--stroke2); }
+.x-acchead {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 4px; background: none; border: none; cursor: pointer;
+  font-size: var(--fs400); font-weight: var(--fwSemi); color: var(--fg1); text-align: left;
+}
+.x-acchead:hover { background: var(--subtleHover); }
+.x-acchead:focus-visible { outline: 2px solid var(--brandStroke1); outline-offset: -2px; }
+.x-accchevron { font-size: 10px; color: var(--fg3); transition: transform .1s ease; width: 12px; flex-shrink: 0; }
+.x-accitem.open .x-accchevron { transform: rotate(90deg); }
+.x-accpanel { padding: 4px 4px 12px 4px; display: flex; flex-direction: column; gap: 4px; }
+
+/* ── TabList, size="small" ── */
+.x-tablist { display: flex; gap: 0; }
+.x-tab {
+  position: relative; padding: 4px 8px 6px; background: none; border: none; cursor: pointer;
+  font-size: var(--fs200); font-weight: var(--fwSemi); color: var(--fg2); line-height: 16px;
+}
+.x-tab:hover { color: var(--fg1); }
+.x-tab.selected { color: var(--fg1); }
+.x-tab.selected::after {
+  content: ""; position: absolute; left: 8px; right: 8px; bottom: 0;
+  height: 2px; border-radius: var(--r-circ); background: var(--brandBg);
+}
+.x-tab:focus-visible { outline: 2px solid var(--brandStroke1); outline-offset: -2px; }
+
+/* ═══ floating layer: tooltips + popovers ══════════════════════════════════ */
+#overlay { position: fixed; inset: 0; pointer-events: none; z-index: 100; }
+.x-scrim { position: fixed; inset: 0; pointer-events: auto; }
+.x-tooltip {
+  position: fixed; pointer-events: none; z-index: 200;
+  max-width: 260px; padding: 4px 11px;
+  background: var(--bg1); color: var(--fg1);
+  border: 1px solid var(--stroke1); border-radius: var(--r-md);
+  box-shadow: var(--shadow16);
+  font-size: var(--fs200); line-height: 16px;
+}
+.x-popover {
+  position: fixed; pointer-events: auto; z-index: 150;
+  background: var(--bg1); color: var(--fg1);
+  border: 1px solid var(--stroke1); border-radius: var(--r-md);
+  box-shadow: var(--shadow16); padding: 16px;
+  max-height: calc(100vh - 24px); overflow-y: auto;
+}
+.x-popover.relayurl { width: 360px; padding: 16px 18px; }
+.x-pophead { font-size: var(--fs300); font-weight: var(--fwSemi); color: var(--fg1); margin-bottom: 4px; line-height: 1.3; }
+.x-popintro { font-size: var(--fs200); color: var(--fg2); line-height: 1.5; margin-bottom: 4px; }
+.x-popsectionlabel {
+  display: flex; align-items: center; gap: 8px;
+  margin: 14px 0 8px; font-size: 10px; font-weight: var(--fwSemi);
+  color: var(--fg3); text-transform: uppercase; letter-spacing: .6px;
+}
+.x-popsectionline { flex: 1; height: 1px; background: var(--stroke2); }
+.x-popsteps { display: flex; flex-direction: column; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.x-popstep { display: flex; align-items: flex-start; gap: 10px; font-size: var(--fs200); color: var(--fg2); line-height: 1.45; }
+.x-popstepnum {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--bg5); color: var(--fg3);
+  font-size: 10px; font-weight: var(--fwBold); line-height: 1; margin-top: 1px;
+}
+.x-popfooter { font-size: 11px; color: var(--fg3); margin-top: 12px; font-style: italic; line-height: 1.4; }
+.x-popfooter.set { color: var(--doneFg); font-style: normal; font-weight: var(--fwSemi); }
+
+/* ═══ viewer stage contents ════════════════════════════════════════════════ */
+.x-stageidle {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; background: var(--bg2); color: var(--fg4);
+  font-size: var(--fs200); text-align: center; padding: 16px;
+}
+.x-stageidle .hint { font-size: 11px; color: var(--fg4); max-width: 320px; line-height: 1.5; }
+
+.x-stageboot {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; background: var(--bg2); color: var(--fg3); font-size: var(--fs200);
+}
+.x-bootstage { font-family: var(--mono); font-size: 11px; color: var(--fg4); }
+.x-bootbar { width: 180px; height: 3px; border-radius: var(--r-circ); background: var(--bg5); overflow: hidden; }
+.x-bootbar > i { display: block; height: 100%; background: var(--brandBg); transition: width .25s ease; }
+
+.x-stagefail {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; background: var(--bg2); padding: 16px; text-align: center;
+}
+.x-failtitle { font-size: var(--fs300); font-weight: var(--fwSemi); color: var(--logError); }
+.x-failbody { font-size: 11px; color: var(--fg3); font-family: var(--mono); max-width: 340px; line-height: 1.5; }
+
+/* ── the deck viewer ── */
+.x-viewer { position: absolute; inset: 0; display: flex; flex-direction: column; background: #1f1f1f; }
+.x-viewertop {
+  display: flex; align-items: center; gap: 8px; padding: 4px 8px; flex-shrink: 0;
+  background: #171717; color: #d6d6d6; font-size: 11px;
+  border-bottom: 1px solid #2b2b2b;
+}
+.x-deckname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .85; }
+.x-livebadge {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  padding: 1px 7px; border-radius: var(--r-circ);
+  font-size: 9.5px; font-weight: var(--fwBold); letter-spacing: .5px; text-transform: uppercase;
+}
+.x-livebadge.presenter { background: rgba(230,81,0,.22); color: #ffb27a; }
+.x-livebadge.attendee  { background: rgba(0,105,92,.28); color: #7fd6c9; }
+.x-livedot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.x-livebadge.presenter .x-livedot { animation: x-pulse 1.8s ease-in-out infinite; }
+@keyframes x-pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+.x-slidecounter { margin-left: auto; flex-shrink: 0; opacity: .7; font-variant-numeric: tabular-nums; }
+
+.x-viewermain { flex: 1; display: flex; min-height: 0; }
+
+/* thumbnail rail */
+.x-rail {
+  width: 96px; flex-shrink: 0; overflow-y: auto; padding: 6px 4px;
+  background: #191919; border-right: 1px solid #2b2b2b;
+  display: flex; flex-direction: column; gap: 5px;
+}.x-thumb {
+  position: relative; flex-shrink: 0; width: 100%; aspect-ratio: 16 / 9;
+  border-radius: 2px; overflow: hidden; cursor: pointer;
+  border: 1.5px solid transparent; background: #fff; padding: 0;
+  transition: border-color .12s;
+}
+.x-thumb:hover { border-color: #6b6b6b; }
+.x-thumb.current { border-color: var(--brandBg); }
+.x-thumb.presenterAt { border-color: var(--presenter); }
+.x-thumb:focus-visible { outline: 2px solid var(--brandStroke1); outline-offset: 1px; }
+.x-thumbnum {
+  position: absolute; left: 2px; bottom: 1px; z-index: 2;
+  font-size: 8px; color: #666; font-variant-numeric: tabular-nums;
+}
+
+/* slide — fitted to whichever axis binds first, so the box stays exactly 16:9.
+   Setting height:100% together with aspect-ratio does not work: the explicit
+   height wins, max-width clamps the width, and the SVG letterboxes inside a
+   box that is no longer 16:9. Container units size the box directly instead. */
+.x-slidewrap {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 10px; min-width: 0; min-height: 0; overflow: hidden;
+  container-type: size;
+}
+.x-slide {
+  width: min(100%, calc(100cqh * 16 / 9));
+  aspect-ratio: 16 / 9;
+  max-width: 100%; max-height: 100%;
+  background: #fff; border-radius: 2px; box-shadow: 0 2px 12px rgba(0,0,0,.45);
+  overflow: hidden; position: relative; flex-shrink: 0;
+}
+.x-slide.advancing { animation: x-slidein .22s ease; }
+@keyframes x-slidein { from { opacity: .35; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+.x-slide svg { display: block; width: 100%; height: 100%; }
+
+/* ═══ file picker (invented stand-in for the real host picker iframe) ══════ */
+.x-picker {
+  flex: 1; display: flex; flex-direction: column; min-height: 0;
+  border: 1px solid var(--stroke2); border-radius: var(--r-md); background: var(--bg1); overflow: hidden;
+}
+.x-pickerhead {
+  display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+  border-bottom: 1px solid var(--stroke2); flex-shrink: 0;
+}
+.x-pickertitle { font-size: var(--fs300); font-weight: var(--fwSemi); }
+.x-pickersub { font-size: 11px; color: var(--fg3); }
+.x-pickerlist { flex: 1; overflow-y: auto; padding: 4px 0; }
+.x-pickerrow {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 7px 14px; background: none; border: none; cursor: pointer; text-align: left;
+}
+.x-pickerrow:hover { background: var(--subtleHover); }
+.x-pickerrow.selected { background: var(--brandBg2); }
+.x-pickerrow:focus-visible { outline: 2px solid var(--brandStroke1); outline-offset: -2px; }
+.x-pickericon { width: 16px; height: 16px; flex-shrink: 0; }
+.x-pickername { flex: 1; min-width: 0; font-size: var(--fs200); color: var(--fg1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.x-pickermeta { font-size: 11px; color: var(--fg3); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.x-pickerfoot {
+  display: flex; align-items: center; gap: 8px; justify-content: flex-end;
+  padding: 10px 14px; border-top: 1px solid var(--stroke2); flex-shrink: 0;
+}
+.x-pickerfoot .spacer { margin-right: auto; font-size: 11px; color: var(--fg3); }
+
+/* ═══ keyboard-shortcut hint strip ═════════════════════════════════════════ */
+.x-kbdbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 3px 16px 5px; background: var(--bg1);
+  border-bottom: 1px solid var(--stroke2); flex-shrink: 0;
+  font-size: 10.5px; color: var(--fg4);
+}
+.x-kbd {
+  display: inline-block; min-width: 16px; text-align: center;
+  padding: 0 4px; margin-right: 3px;
+  border: 1px solid var(--stroke1); border-bottom-width: 2px; border-radius: 3px;
+  background: var(--bg2); color: var(--fg3);
+  font-family: var(--mono); font-size: 9.5px; line-height: 15px;
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="overlay"></div>
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════════
+   1. DOM helpers
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** el("button.cls#id", {props}, ...children) → HTMLElement. */
+function el(spec, props, ...children) {
+  const m = /^([a-zA-Z0-9-]*)((?:[.#][^.#]+)*)$/.exec(spec) || [];
+  const tag = m[1] || "div";
+  const node = document.createElement(tag);
+  const classes = [];
+  let id = "";
+  (m[2] || "").replace(/([.#])([^.#]+)/g, (_, sig, val) => {
+    if (sig === ".") classes.push(val); else id = val;
+    return "";
+  });
+  if (classes.length) node.className = classes.join(" ");
+  if (id) node.id = id;
+  if (props) {
+    for (const k of Object.keys(props)) {
+      const v = props[k];
+      if (v === null || v === undefined || v === false) continue;
+      if (k === "class") node.className = (node.className ? node.className + " " : "") + v;
+      else if (k === "style" && typeof v === "object") Object.assign(node.style, v);
+      else if (k === "html") node.innerHTML = v;
+      else if (k === "text") node.textContent = v;
+      else if (k === "dataset") Object.assign(node.dataset, v);
+      else if (k.startsWith("on") && typeof v === "function") node.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (v === true) node.setAttribute(k, "");
+      else node.setAttribute(k, String(v));
+    }
+  }
+  add(node, children);
+  return node;
+}
+
+function add(parent, children) {
+  for (const c of children) {
+    if (c === null || c === undefined || c === false) continue;
+    if (Array.isArray(c)) add(parent, c);
+    else if (c instanceof Node) parent.appendChild(c);
+    else parent.appendChild(document.createTextNode(String(c)));
+  }
+  return parent;
+}
+
+function clear(node) { while (node && node.firstChild) node.removeChild(node.firstChild); return node; }
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+function svg(tag, attrs, ...children) {
+  const n = document.createElementNS(SVG_NS, tag);
+  if (attrs) for (const k of Object.keys(attrs)) {
+    if (attrs[k] === null || attrs[k] === undefined) continue;
+    n.setAttribute(k, String(attrs[k]));
+  }
+  for (const c of children) if (c) n.appendChild(c);
+  return n;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2. Formatters
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Matches the app's LogPanel: 24-hour clock plus zero-padded milliseconds. */
+function formatLogTime(ts) {
+  const d = new Date(ts);
+  return d.toLocaleTimeString("en-US", { hour12: false }) + "." + String(d.getMilliseconds()).padStart(3, "0");
+}
+
+function formatBytes(n) {
+  if (!n) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let i = 0, v = n;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return (v >= 10 || i === 0 ? Math.round(v) : v.toFixed(1)) + " " + units[i];
+}
+
+function truncateMiddle(s, max) {
+  if (!s || s.length <= max) return s;
+  const head = Math.ceil((max - 1) / 2), tail = Math.floor((max - 1) / 2);
+  return s.slice(0, head) + "…" + s.slice(s.length - tail);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3. Seeded RNG — deterministic so every visitor sees the same demo, and so a
+      headless test can assert on generated values.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const rng = mulberry32(0x51ade5);
+function rand() { return rng(); }
+function randInt(lo, hi) { return lo + Math.floor(rand() * (hi - lo + 1)); }
+function pick(arr) { return arr[Math.floor(rand() * arr.length)]; }
+
+const HEX = "0123456789abcdef";
+function hex(n) { let s = ""; for (let i = 0; i < n; i++) s += HEX[Math.floor(rand() * 16)]; return s; }
+/** RFC-4122-shaped v4 identifier from the seeded stream (never crypto.randomUUID —
+ *  a fixed stream keeps the demo reproducible). */
+function uuid() {
+  return hex(8) + "-" + hex(4) + "-4" + hex(3) + "-" + HEX[8 + Math.floor(rand() * 4)] + hex(3) + "-" + hex(12);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   4. Fictional world
+      Every host, service, product, feature-gate and identifier below is
+      invented. Shapes mirror the real ones; the names do not.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const WORLD = {
+  productName: "Slidecast Live",
+  appTitle: "Slidecast Live Playground",
+  hostApp: "Northwind Meet",
+  hostName: "NWMeet",
+  renderHost: "render-west.contoso-apps.example.com",
+  onDemandHost: "ondemand.stage.contoso-apps.example.com",
+  relayHost: "relay.contoso-apps.example.com",
+  relayEdge: "wus-dc.relay.stage.contoso-apps.example.com",
+  vaultHost: "fabrikam-my.vault.example.com",
+  fontsHost: "fonts-cdn.contoso-apps.example.com",
+  cdnHost: "cdn.contoso-apps.example.com",
+  identityHost: "login.identity.example.com",
+  accounts: ["dana.reyes@fabrikam.example.com", "avery.lund@fabrikam.example.com", "j.okafor@fabrikam.example.com"],
+};
+
+/** Viewer event codes. Sparse numbering mirrors the real enum's shape; the
+ *  values and names are invented. */
+const EventType = {
+  GetSlidesInShowCount: 0,
+  GetCurrentPosition: 2,
+  OnPositionChanged: 5,
+  OnPresentationOpened: 6,
+  OnMediaEvent: 12,
+  OnError: 14,
+  OnEnterEndOfSlideshow: 21,
+  IdpTokenRequest: 31,
+  OnAnnotationChanged: 34,
+  RoleChangedOutbound: 38,
+  OnOpticalZoomChanged: 41,
+  TakeControl: 44,
+};
+const EventName = Object.fromEntries(Object.entries(EventType).map(([k, v]) => [v, k]));
+
+const FEATURE_GATES = {
+  RenderBlockListForBrowserVersion: "Chrome:66;Edge:19",
+  RenderBlockListForGpuRenderer: "Mali-G72;SoftRaster;Adreno 505",
+  PlaybackBlockListForBrowserVersion: "Chrome:66;Edge:19",
+  PlaybackAllowListForFileType: "sdx;sdsx;sdtx;sdxm;sdsm;sdt;sdc",
+  EnableHealthLogging: true,
+  HostBootTimeoutConfigInMs: 90000,
+  DetectStalledFramesWithinTimeouts: true,
+  EnableNewRelayService: true,
+  PresUrlBootTimeoutMS: 4000,
+  EnableTimeoutClock: true,
+  EnableEdgeRouteRolloutPercentage: 0.25,
+  EnableContainerCleanupOnDispose: true,
+  EnableChannelHandshakeRetry: true,
+  EnableBackupChannel: true,
+};
+
+const HOST_PARAMS = {
+  isPasteFileLinkToChatEnabled: true,
+  isCopyFileLinkToClipboardEnabled: true,
+  presenterViewInHost: true,
+  disableSharingNavControlsForPresenter: true,
+  disableSharingNavControlsForAttendee: true,
+  disablePrivateViewingControlForPresenter: false,
+  showRehearseButtonInSharing: false,
+  isMovePrivateViewingToViewerEnabled: true,
+  enableSharingWebviewContainer: false,
+  enableMoveTakeControlToViewer: false,
+  enableMovePresenterNameToViewer: true,
+  enableMagnifySync: true,
+  enableInkToExplain: false,
+  enableLiveChatSummary: false,
+  enableIframeSandbox: false,
+  browserShapeBuilderCompatible: true,
+  enableMigrateRelayToRtc: true,
+  enableRefreshSharingSession: true,
+};
+
+function buildApplicationUrl() {
+  const src = encodeURIComponent(
+    "https://" + WORLD.vaultHost + "/personal/demo_fabrikam_example_com/_api/cfp/files/" + hex(32)
+  );
+  return (
+    "https://" + WORLD.renderHost + "/p/SlideFrame.view" +
+    "?SlideView=ReadingView&ui=en%2DUS&rs=en%2DUS&SrcDoc=" + src +
+    "&sdEnableRoaming=1&sdFR=1&mscc=1&sdODB=1"
+  );
+}
+
+function buildDefaultParams() {
+  const now = new Date();
+  return {
+    /* ApplicationCustomSettings */
+    onDemandServer: "https://" + WORLD.onDemandHost + "/",
+    startingSlideIndex: "0",
+    startingTimelineMappings: "[]",
+
+    /* Top level */
+    applicationUrl: buildApplicationUrl(),
+
+    /* SessionInformation */
+    callId: uuid(),
+    contentId: uuid(),
+    meetingChatId: "19:" + hex(32) + "@channel.v2",
+    dataLocale: "en-us",
+    documentClickTime: now.toISOString(),
+    endpointId: uuid(),
+    environment: "prod",
+    hostBootTimeoutMs: "110000",
+    hostExperience: "web-client",
+    hostInitTime: now.toISOString(),
+    hostName: WORLD.hostName,
+    hostSessionId: uuid(),
+    isPresenter: true,
+    isRetry: false,
+    isRtl: false,
+    isTest: false,
+    participantId: uuid(),
+    featureGates: JSON.stringify(FEATURE_GATES, null, 2),
+    previousHostSessionId: "",
+    region: "",
+    tenantId: uuid(),
+    totalParticipants: "1",
+    uiHostRing: "preview",
+    uiLocale: "en-us",
+    userId: uuid(),
+    hostParams: JSON.stringify(HOST_PARAMS, null, 2),
+
+    /* FilePrecheckInfo */
+    customFontCatalogUrl: "https://" + WORLD.fontsHost + "/shared/fontpack/",
+    docUniqueId: uuid() + "_" + uuid() + "_" + uuid(),
+    eTag: '"{' + uuid() + '},1"',
+    fileGetUrl: "",
+    fileName: "Contoso Q3 Field Review.sdx",
+    fileSize: "2418176",
+    presentationUrl: "",
+    relayPresentationId: uuid(),
+
+    /* Picker results */
+    vaultSiteUrl: "",
+    vaultItemId: "",
+
+    /* Advanced */
+    dynamicWatermarkLabel: "",
+    enableLegacyFallback: false,
+    useTransparentBackground: true,
+    diagnosticsEntryPoint: "playground",
+    diagnosticsBootstrapperScriptLoadPoint: "bundled_local",
+    hostBuildVersion: "2210/local_playground",
+    uiHostIsHighContrast: false,
+    uiHostHighContrastColorSettings: "",
+    bundleInfoMajorVersion: "1",
+    bundleInfoUrl: "placeholder-url",
+    startingMediaStates: "[]",
+  };
+}
+
+/** Mirrors cloneParamsForInstance2: attendee role, fresh session id. */
+function cloneParamsForAttendee(src) {
+  return Object.assign({}, src, { isPresenter: false, hostSessionId: uuid() });
+}
+
+/* ── the synthetic deck ─────────────────────────────────────────────────────
+ * Rendered as inline SVG on a 1600×900 canvas so slides scale crisply at any
+ * panel width, including the 96px thumbnails. */
+const ACCENT = { deep: "#1f3864", mid: "#2f5597", light: "#8faadc", warm: "#c55a11", grey: "#7f7f7f" };
+
+const DECK = {
+  name: "Contoso Q3 Field Review.sdx",
+  slides: [
+    { kind: "title", title: "Q3 Field Review", sub: "Contoso Cloud · Northwind Region", foot: "Prepared by Field Engineering" },
+    { kind: "agenda", title: "Agenda", items: ["Adoption", "Reliability", "Cost to serve", "What's next"] },
+    { kind: "section", num: "01", title: "Adoption" },
+    { kind: "bullets", title: "Seat growth held through the quarter", items: [
+      "Activated seats up 14% quarter over quarter",
+      "Northwind and Fabrikam drove most of the net add",
+      "Trial-to-paid conversion steady at 31%",
+      "Two enterprise pilots moved to committed spend",
+    ] },
+    { kind: "bar", title: "Monthly active workspaces", unit: "thousands",
+      bars: [["Apr", 41], ["May", 46], ["Jun", 48], ["Jul", 55], ["Aug", 61], ["Sep", 68]] },
+    { kind: "stats", title: "Quarter at a glance", stats: [
+      ["68.4k", "Active workspaces"], ["+14%", "Seat growth QoQ"], ["31%", "Trial conversion"],
+    ] },
+    { kind: "section", num: "02", title: "Reliability" },
+    { kind: "line", title: "p95 session start latency", unit: "milliseconds",
+      points: [1420, 1360, 1180, 1240, 980, 910, 870, 840] },
+    { kind: "bullets", title: "Two incidents, both mitigated same-day", items: [
+      "INC-4417 — relay handshake retries exhausted in one region",
+      "INC-4502 — font pack cache miss slowed cold starts",
+      "Mean time to mitigate: 34 minutes",
+      "No customer-reported data loss",
+    ] },
+    { kind: "section", num: "03", title: "What's next" },
+    { kind: "bullets", title: "Q4 commitments", items: [
+      "Ship the new relay service to all regions",
+      "Cut cold-start p95 below 700 ms",
+      "Close out the remaining legacy-fallback paths",
+      "Expand the field pilot to two more segments",
+    ] },
+    { kind: "closing", title: "Thank you", sub: "Questions → field-eng@contoso.example.com" },
+  ],
+};
+
+/** Files offered by the stand-in picker. */
+const PICKER_FILES = [
+  { name: "Contoso Q3 Field Review.sdx", size: 2418176, modified: "2 hours ago" },
+  { name: "Northwind Onboarding Deck.sdx", size: 8734208, modified: "yesterday" },
+  { name: "Reliability Readout — September.sdx", size: 1194496, modified: "3 days ago" },
+  { name: "Field Enablement All-Hands.sdx", size: 15925248, modified: "last week" },
+  { name: "Pricing Workshop (draft).sdx", size: 664576, modified: "last week" },
+  { name: "Partner Summit Keynote.sdx", size: 24117248, modified: "2 weeks ago" },
+];
+</script>
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════════
+   5. State
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const PRESENTER_ID = "instance-1";
+const ATTENDEE_ID = "instance-2";
+const INSTANCE_LABEL = { "instance-1": "P", "instance-2": "A" };
+const INSTANCE_COLOR = { "instance-1": "#e65100", "instance-2": "#00695c" };
+const MAX_LOGS = 600;
+
+function makeInstance(params) {
+  return {
+    params,
+    bootType: "local",        // "local" | "cdn"
+    slideshowType: "cdn",     // "cdn" | "local"
+    phase: "idle",            // idle | booting | booted | failed
+    bootStep: 0,
+    failure: null,
+    slideIndex: 0,
+    goTo: "2",
+    advanceToken: 0,
+  };
+}
+
+const baseParams = buildDefaultParams();
+
+const state = {
+  mode: "single",             // "single" | "dual"
+  authReady: false,
+  signedIn: false,
+  accountName: "",
+
+  pickerActive: false,
+  pickerSelection: 0,
+  pickedFile: null,
+  isRedeeming: false,
+  isRelaying: false,
+  relayUrlManuallySet: false,
+
+  drawerOpen: false,
+  activeParamTab: PRESENTER_ID,
+  openAccordions: { main: true, advanced: false },
+  paramRev: 0,
+
+  logs: [],
+  logSeq: 0,
+  logFilter: "all",
+  logFollowTail: true,
+
+  presenterSlideIndex: 0,
+  instances: {
+    "instance-1": makeInstance(baseParams),
+    "instance-2": makeInstance(cloneParamsForAttendee(baseParams)),
+  },
+
+  overlay: null,              // { kind, rect, ...extra }
+};
+
+function inst(id) { return state.instances[id]; }
+function anyBusy() { return state.pickerActive || state.isRedeeming || state.isRelaying; }
+function relayUrlActive() {
+  return state.relayUrlManuallySet && inst(PRESENTER_ID).params.presentationUrl.trim().length > 0;
+}
+/** Boot is reachable once there is any way to render slides: a picked file
+ *  (auto-relayed) or a hand-pasted relay URL. */
+function canBoot() { return state.pickedFile !== null || relayUrlActive(); }
+function isBooted(id) { return inst(id).phase === "booted"; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   6. Logging
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function addLog(level, message, instanceId) {
+  state.logs.push({ id: ++state.logSeq, level, message, timestamp: Date.now(), instanceId });
+  if (state.logs.length > MAX_LOGS) state.logs.splice(0, state.logs.length - MAX_LOGS);
+  renderAll();
+}
+const logP = (level, msg) => addLog(level, msg, PRESENTER_ID);
+const logA = (level, msg) => addLog(level, msg, ATTENDEE_ID);
+function logFor(id) { return (level, msg) => addLog(level, msg, id); }
+
+function visibleLogs() {
+  if (state.logFilter === "all") return state.logs;
+  return state.logs.filter((e) => !e.instanceId || e.instanceId === state.logFilter);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7. Render loop
+      One state object; renderAll() batches through requestAnimationFrame and
+      swaps regions in place. Focus, selection and scroll offsets are captured
+      before the swap and restored after it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const appEl = document.getElementById("app");
+const overlayEl = document.getElementById("overlay");
+
+/** True only while renderNow is swapping regions, so blur handlers can tell a
+ *  real user blur from the one a rebuild fires as it tears out the focused
+ *  node. Without this an open inline editor closes itself mid-edit. */
+let isRendering = false;
+let renderQueued = false;
+let renderCount = 0;
+
+function renderAll() {
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => { renderQueued = false; renderNow(); });
+}
+
+function captureFocus() {
+  const a = document.activeElement;
+  if (!a || a === document.body) return null;
+  const key = a.dataset && a.dataset.fkey;
+  if (!key) return null;
+  const memo = { key };
+  if (typeof a.selectionStart === "number") {
+    memo.start = a.selectionStart;
+    memo.end = a.selectionEnd;
+  }
+  return memo;
+}
+
+function restoreFocus(memo) {
+  if (!memo) return;
+  const node = document.querySelector('[data-fkey="' + cssEscape(memo.key) + '"]');
+  if (!node) return;
+  // preventScroll matters: a plain focus() scrolls the field into view, which
+  // would undo restoreScrolls and jerk a scrolled panel back on every keystroke.
+  try { node.focus({ preventScroll: true }); } catch (e) { node.focus(); }
+  if (memo.start !== undefined && node.setSelectionRange) {
+    try { node.setSelectionRange(memo.start, memo.end); } catch (e) { /* not a text field */ }
+  }
+}
+
+function cssEscape(s) {
+  if (window.CSS && CSS.escape) return CSS.escape(s);
+  return String(s).replace(/["\\]/g, "\\$&");
+}
+
+/* Scroll-position memory. Regions are rebuilt wholesale, so any scroll
+ * container inside one would jump back to the top — the params drawer on every
+ * keystroke, the log area several times a second while booting. Any element
+ * tagged data-scroll="<key>" has its offsets remembered under that key and
+ * restored after the swap. */
+const scrollMemo = new Map();
+function captureScrolls() {
+  for (const n of document.querySelectorAll("[data-scroll]")) {
+    const k = n.dataset.scroll;
+    if (n.scrollTop || n.scrollLeft) scrollMemo.set(k, { top: n.scrollTop, left: n.scrollLeft });
+    else scrollMemo.delete(k);
+  }
+}
+function restoreScrolls() {
+  for (const n of document.querySelectorAll("[data-scroll]")) {
+    const m = scrollMemo.get(n.dataset.scroll);
+    if (!m) continue;
+    if (m.top) n.scrollTop = m.top;
+    if (m.left) n.scrollLeft = m.left;
+  }
+}
+
+function renderNow() {
+  const focusMemo = captureFocus();
+  captureScrolls();
+  renderCount++;
+
+  isRendering = true;
+  try {
+    // The shell is built once; regions are swapped inside it so the log
+    // scroller and its offset survive every re-render.
+    if (!appEl.firstChild) {
+      appEl.appendChild(el("div#region-topbar"));
+      appEl.appendChild(el("div#region-kbd"));
+      appEl.appendChild(el("div.x-body#region-body"));
+      appEl.appendChild(el("div.x-logsection#region-logs"));
+    }
+    swap("region-topbar", renderTopBar());
+    swap("region-kbd", renderKeyboardBar());
+    renderBodyRegion();
+    renderLogRegion();
+    renderOverlay();
+  } finally {
+    isRendering = false;
+  }
+
+  restoreScrolls();
+  ensureThumbVisible(PRESENTER_ID);
+  ensureThumbVisible(ATTENDEE_ID);
+  restoreFocus(focusMemo);
+}
+
+/** Keep the current slide's thumbnail inside the rail's viewport. Runs after
+ *  restoreScrolls and writes back to the memo, so the adjustment is not undone
+ *  by the next render. */
+function ensureThumbVisible(id) {
+  const it = inst(id);
+  if (it.phase !== "booted") return;
+  const rail = document.querySelector('[data-testid="rail-' + id + '"]');
+  if (!rail) return;
+  const thumb = rail.querySelector('[data-testid="thumb-' + id + "-" + it.slideIndex + '"]');
+  if (!thumb) return;
+  const viewTop = rail.scrollTop;
+  const viewH = rail.clientHeight;
+  const top = thumb.offsetTop;
+  const h = thumb.offsetHeight;
+  let next = viewTop;
+  if (top < viewTop) next = top - 4;
+  else if (top + h > viewTop + viewH) next = top + h - viewH + 4;
+  if (next === viewTop) return;
+  rail.scrollTop = Math.max(0, next);
+  if (rail.dataset.scroll) scrollMemo.set(rail.dataset.scroll, { top: rail.scrollTop, left: 0 });
+}
+
+/** Put `node` (or nothing) inside `host`, leaving it untouched when it is
+ *  already the only child. Detaching and re-attaching matters even when the
+ *  node object is identical: Chrome cancels a click if the pressed element
+ *  leaves the document between mousedown and mouseup, so a reused node that
+ *  gets re-parented every render still swallows clicks. */
+function setSlot(host, node) {
+  if (!host) return;
+  if (!node) { clear(host); return; }
+  if (host.firstChild === node && host.childNodes.length === 1) return;
+  clear(host);
+  host.appendChild(node);
+}
+
+function swap(id, node) { setSlot(document.getElementById(id), node); }
+
+/** A wrapper that does not participate in layout, so a region can own a stable
+ *  slot without disturbing its parent's flexbox. */
+function slot() { return el("div", { style: { display: "contents" } }); }
+
+/* Node reuse.
+ *
+ * Regions are swapped wholesale, so without this every button would be a brand
+ * new element on every render. That breaks any click that straddles a render:
+ * mousedown lands on the old node, mouseup on its replacement, and the click is
+ * never dispatched on the button. During a boot the app re-renders roughly five
+ * times a second, which is exactly when Stop is most likely to be pressed.
+ *
+ * A cached node whose content signature is unchanged is returned as-is; setSlot
+ * then leaves it in place rather than re-parenting it. */
+const nodeCache = new Map();
+function reuse(key, sig, build) {
+  const hit = nodeCache.get(key);
+  if (hit && hit.sig === sig) return hit.node;
+  const node = build();
+  nodeCache.set(key, { sig, node });
+  return node;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   8. Tooltip + popover layer
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let tipEl = null, tipTimer = null;
+function attachTip(node, text) {
+  if (!text) return node;
+  node.addEventListener("pointerenter", () => {
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(() => showTip(node, text), 400);
+  });
+  node.addEventListener("pointerleave", hideTip);
+  node.addEventListener("pointerdown", hideTip);
+  node.addEventListener("focus", () => showTip(node, text));
+  node.addEventListener("blur", hideTip);
+  return node;
+}
+function showTip(anchor, text) {
+  hideTip();
+  if (!anchor.isConnected) return;
+  tipEl = el("div.x-tooltip", { role: "tooltip" }, text);
+  document.body.appendChild(tipEl);
+  const r = anchor.getBoundingClientRect();
+  const b = tipEl.getBoundingClientRect();
+  let top = r.bottom + 6;
+  if (top + b.height > window.innerHeight - 8) top = Math.max(8, r.top - b.height - 6);
+  let left = r.left + r.width / 2 - b.width / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - b.width - 8));
+  tipEl.style.top = top + "px";
+  tipEl.style.left = left + "px";
+}
+function hideTip() {
+  clearTimeout(tipTimer);
+  if (tipEl) { tipEl.remove(); tipEl = null; }
+}
+
+const OVERLAYS = {};
+function openOverlay(kind, anchor, extra) {
+  const r = anchor.getBoundingClientRect();
+  state.overlay = Object.assign({ kind, rect: { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width } }, extra || {});
+  hideTip();
+  renderAll();
+}
+function closeOverlay() { state.overlay = null; renderAll(); }
+function toggleOverlay(kind, anchor, extra) {
+  if (state.overlay && state.overlay.kind === kind && (!extra || state.overlay.instanceId === extra.instanceId)) closeOverlay();
+  else openOverlay(kind, anchor, extra);
+}
+
+function renderOverlay() {
+  clear(overlayEl);
+  const o = state.overlay;
+  if (!o) return;
+  const build = OVERLAYS[o.kind];
+  if (!build) return;
+  const content = build(o);
+  if (!content) return;
+  content.dataset.scroll = "overlay:" + o.kind + ":" + (o.instanceId || "");
+  const scrim = el("div.x-scrim", {
+    onmousedown: (e) => { if (e.target === scrim) closeOverlay(); },
+  });
+  overlayEl.appendChild(scrim);
+  overlayEl.appendChild(content);
+  positionFloating(content, o.rect, o.align || "end");
+}
+
+/** Place a floating panel under its anchor, flipping above and clamping to the
+ *  viewport when it would overflow. */
+function positionFloating(node, rect, align) {
+  node.style.visibility = "hidden";
+  const b = node.getBoundingClientRect();
+  const gap = 6;
+  let top = rect.bottom + gap;
+  if (top + b.height > window.innerHeight - 8) {
+    const above = rect.top - b.height - gap;
+    top = above >= 8 ? above : Math.max(8, window.innerHeight - b.height - 8);
+  }
+  let left = align === "start" ? rect.left : rect.right - b.width;
+  left = Math.max(8, Math.min(left, window.innerWidth - b.width - 8));
+  node.style.top = top + "px";
+  node.style.left = left + "px";
+  node.style.visibility = "";
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   9. Widgets
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function btn(opts) {
+  const cls = ["x-btn"];
+  if (opts.appearance === "primary") cls.push("primary");
+  if (opts.appearance === "subtle") cls.push("subtle");
+  if (opts.stop) cls.push("stop");
+  if (opts.icon && !opts.label) cls.push("icon");
+  if (opts.cls) cls.push(opts.cls);
+  const node = el("button", {
+    class: cls.join(" "),
+    type: "button",
+    disabled: !!opts.disabled,
+    "aria-label": opts.ariaLabel || opts.label || opts.tooltip,
+    dataset: opts.testid ? { testid: opts.testid } : undefined,
+    onclick: opts.disabled ? undefined : opts.onClick,
+  }, opts.icon || null, opts.label || null);
+  return attachTip(node, opts.tooltip);
+}
+
+function textInput(opts) {
+  const wrap = el("div", { class: "x-inputwrap" + (opts.disabled ? " disabled" : ""), style: opts.width ? { width: opts.width } : undefined });
+  const input = el("input", {
+    type: "text",
+    value: opts.value === undefined || opts.value === null ? "" : String(opts.value),
+    placeholder: opts.placeholder,
+    disabled: !!opts.disabled,
+    spellcheck: "false",
+    autocomplete: "off",
+    "aria-label": opts.ariaLabel,
+    dataset: Object.assign({ fkey: opts.fkey }, opts.testid ? { testid: opts.testid } : {}),
+  });
+  input.addEventListener("input", () => opts.onInput && opts.onInput(input.value));
+  if (opts.onEnter) {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); opts.onEnter(input.value); }
+    });
+  }
+  wrap.appendChild(input);
+  return wrap;
+}
+
+function textArea(opts) {
+  const ta = el("textarea", {
+    class: "x-textarea",
+    rows: String(opts.rows || 6),
+    spellcheck: "false",
+    "aria-label": opts.ariaLabel,
+    dataset: { fkey: opts.fkey },
+  });
+  ta.value = opts.value || "";
+  ta.addEventListener("input", () => opts.onInput && opts.onInput(ta.value));
+  return ta;
+}
+
+function field(label, control) {
+  return el("div.x-field", null, el("label.x-fieldlabel", null, label), control);
+}
+
+function switchRow(opts) {
+  const node = el("div", {
+    class: "x-switch" + (opts.checked ? " on" : ""),
+    role: "switch",
+    tabindex: "0",
+    "aria-checked": String(!!opts.checked),
+    "aria-label": opts.label,
+    dataset: Object.assign({ fkey: opts.fkey }, opts.testid ? { testid: opts.testid } : {}),
+    onclick: () => opts.onChange(!opts.checked),
+    onkeydown: (e) => {
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); opts.onChange(!opts.checked); }
+    },
+  },
+    el("span.x-switchtrack", null, el("span.x-switchthumb")),
+    el("span.x-switchlabel", null, opts.label));
+  return node;
+}
+
+function radioGroup(opts) {
+  const group = el("div", { class: "x-radiogroup" + (opts.layout === "vertical" ? " vertical" : ""), role: "radiogroup", "aria-label": opts.ariaLabel });
+  for (const o of opts.options) {
+    const on = o.value === opts.value;
+    const disabled = !!o.disabled;
+    group.appendChild(el("div", {
+      class: "x-radio" + (on ? " on" : "") + (disabled ? " disabled" : ""),
+      role: "radio",
+      tabindex: disabled ? "-1" : "0",
+      "aria-checked": String(on),
+      dataset: o.testid ? { testid: o.testid } : undefined,
+      onclick: disabled ? undefined : () => opts.onChange(o.value),
+      onkeydown: disabled ? undefined : (e) => {
+        if (e.key === " " || e.key === "Enter") { e.preventDefault(); opts.onChange(o.value); }
+      },
+    },
+      el("span.x-radiomark"),
+      el("span.x-radiolabel", null, o.label)));
+  }
+  return group;
+}
+
+function tabList(opts) {
+  const list = el("div.x-tablist", { role: "tablist" });
+  for (const t of opts.tabs) {
+    list.appendChild(el("button", {
+      class: "x-tab" + (t.value === opts.value ? " selected" : ""),
+      type: "button",
+      role: "tab",
+      "aria-selected": String(t.value === opts.value),
+      dataset: { testid: (opts.testidPrefix || "tab") + "-" + t.value },
+      onclick: () => opts.onChange(t.value),
+    }, t.label));
+  }
+  return list;
+}
+</script>
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════════
+   10. Slide renderer — inline SVG on a 1600×900 canvas, so the same markup is
+       crisp in the 96px thumbnail rail and in a full-width panel.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const SW = 1600, SH = 900;
+
+/** Greedy wrap by character budget — good enough for a fixed demo deck. */
+function wrapText(text, maxChars) {
+  const words = String(text).split(/\s+/);
+  const lines = [];
+  let line = "";
+  for (const w of words) {
+    const next = line ? line + " " + w : w;
+    if (next.length > maxChars && line) { lines.push(line); line = w; }
+    else line = next;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function tx(str, x, y, opts) {
+  const o = opts || {};
+  return svg("text", {
+    x, y,
+    "font-family": "Segoe UI, Roboto, Helvetica Neue, sans-serif",
+    "font-size": o.size || 40,
+    "font-weight": o.weight || 400,
+    fill: o.fill || "#242424",
+    "text-anchor": o.anchor || "start",
+    "letter-spacing": o.tracking || 0,
+  }, document.createTextNode(str));
+}
+
+function renderSlideSvg(slide) {
+  const root = svg("svg", { viewBox: "0 0 " + SW + " " + SH, preserveAspectRatio: "xMidYMid meet", role: "img", "aria-label": slide.title });
+  root.appendChild(svg("rect", { x: 0, y: 0, width: SW, height: SH, fill: "#ffffff" }));
+  const M = 130;
+
+  if (slide.kind === "title") {
+    root.appendChild(svg("rect", { x: 0, y: 0, width: 26, height: SH, fill: ACCENT.mid }));
+    root.appendChild(tx(slide.title, M, 400, { size: 108, weight: 700, fill: ACCENT.deep, tracking: -2 }));
+    root.appendChild(svg("rect", { x: M, y: 448, width: 210, height: 9, fill: ACCENT.warm }));
+    root.appendChild(tx(slide.sub, M, 540, { size: 44, fill: "#5a5a5a" }));
+    root.appendChild(tx(slide.foot, M, 800, { size: 28, fill: "#9a9a9a" }));
+    return root;
+  }
+
+  if (slide.kind === "closing") {
+    root.appendChild(svg("rect", { x: 0, y: 0, width: SW, height: SH, fill: ACCENT.deep }));
+    root.appendChild(tx(slide.title, SW / 2, 440, { size: 104, weight: 700, fill: "#ffffff", anchor: "middle", tracking: -2 }));
+    root.appendChild(tx(slide.sub, SW / 2, 530, { size: 36, fill: "#a9bde0", anchor: "middle" }));
+    return root;
+  }
+
+  if (slide.kind === "section") {
+    root.appendChild(svg("rect", { x: 0, y: 0, width: SW, height: SH, fill: ACCENT.deep }));
+    root.appendChild(tx(slide.num, M, 640, { size: 320, weight: 700, fill: "rgba(255,255,255,0.13)" }));
+    root.appendChild(svg("rect", { x: M, y: 300, width: 120, height: 8, fill: ACCENT.warm }));
+    root.appendChild(tx(slide.title, M, 430, { size: 96, weight: 700, fill: "#ffffff", tracking: -1.5 }));
+    return root;
+  }
+
+  // Shared heading for the content layouts.
+  const headLines = wrapText(slide.title, 34);
+  let y = 170;
+  for (const l of headLines) { root.appendChild(tx(l, M, y, { size: 62, weight: 600, fill: ACCENT.deep, tracking: -1 })); y += 76; }
+  root.appendChild(svg("rect", { x: M, y: y - 44, width: 90, height: 6, fill: ACCENT.warm }));
+  const bodyTop = y + 50;
+
+  if (slide.kind === "agenda") {
+    let ay = bodyTop + 20;
+    slide.items.forEach((item, i) => {
+      root.appendChild(svg("circle", { cx: M + 26, cy: ay - 16, r: 26, fill: ACCENT.light }));
+      root.appendChild(tx(String(i + 1), M + 26, ay - 4, { size: 28, weight: 700, fill: "#ffffff", anchor: "middle" }));
+      root.appendChild(tx(item, M + 82, ay, { size: 46, fill: "#333333" }));
+      ay += 110;
+    });
+    return root;
+  }
+
+  if (slide.kind === "bullets") {
+    let by = bodyTop + 10;
+    for (const item of slide.items) {
+      const lines = wrapText(item, 52);
+      root.appendChild(svg("rect", { x: M, y: by - 26, width: 14, height: 14, fill: ACCENT.warm }));
+      lines.forEach((l, i) => { root.appendChild(tx(l, M + 44, by + i * 54, { size: 40, fill: "#333333" })); });
+      by += 54 * lines.length + 46;
+    }
+    return root;
+  }
+
+  if (slide.kind === "stats") {
+    const cellW = (SW - M * 2) / slide.stats.length;
+    slide.stats.forEach((s, i) => {
+      const cx = M + cellW * i + cellW / 2;
+      root.appendChild(tx(s[0], cx, bodyTop + 190, { size: 132, weight: 700, fill: ACCENT.mid, anchor: "middle", tracking: -3 }));
+      root.appendChild(tx(s[1], cx, bodyTop + 260, { size: 34, fill: "#6b6b6b", anchor: "middle" }));
+    });
+    return root;
+  }
+
+  if (slide.kind === "bar") {
+    const chartTop = bodyTop + 20, chartBottom = 760;
+    const max = Math.max.apply(null, slide.bars.map((b) => b[1])) * 1.15;
+    const slot = (SW - M * 2) / slide.bars.length;
+    const bw = slot * 0.5;
+    root.appendChild(svg("line", { x1: M, y1: chartBottom, x2: SW - M, y2: chartBottom, stroke: "#d9d9d9", "stroke-width": 3 }));
+    slide.bars.forEach((b, i) => {
+      const h = ((b[1] / max) * (chartBottom - chartTop)) | 0;
+      const x = M + slot * i + (slot - bw) / 2;
+      root.appendChild(svg("rect", { x, y: chartBottom - h, width: bw, height: h, fill: i === slide.bars.length - 1 ? ACCENT.warm : ACCENT.mid, rx: 3 }));
+      root.appendChild(tx(String(b[1]), x + bw / 2, chartBottom - h - 20, { size: 30, weight: 600, fill: "#5a5a5a", anchor: "middle" }));
+      root.appendChild(tx(b[0], x + bw / 2, chartBottom + 48, { size: 30, fill: "#8a8a8a", anchor: "middle" }));
+    });
+    root.appendChild(tx(slide.unit, M, chartTop - 14, { size: 26, fill: "#a0a0a0" }));
+    return root;
+  }
+
+  if (slide.kind === "line") {
+    const chartTop = bodyTop + 40, chartBottom = 740;
+    const max = Math.max.apply(null, slide.points) * 1.12;
+    const stepX = (SW - M * 2) / (slide.points.length - 1);
+    const yFor = (v) => chartBottom - (v / max) * (chartBottom - chartTop);
+    for (let g = 0; g <= 3; g++) {
+      const gy = chartTop + ((chartBottom - chartTop) / 3) * g;
+      root.appendChild(svg("line", { x1: M, y1: gy, x2: SW - M, y2: gy, stroke: "#ededed", "stroke-width": 2 }));
+    }
+    const pts = slide.points.map((v, i) => (M + stepX * i) + "," + yFor(v)).join(" ");
+    root.appendChild(svg("polyline", { points: pts, fill: "none", stroke: ACCENT.mid, "stroke-width": 7, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    slide.points.forEach((v, i) => {
+      root.appendChild(svg("circle", { cx: M + stepX * i, cy: yFor(v), r: 9, fill: "#ffffff", stroke: ACCENT.mid, "stroke-width": 5 }));
+    });
+    const last = slide.points[slide.points.length - 1];
+    root.appendChild(tx(String(last) + " ms", SW - M, yFor(last) - 30, { size: 32, weight: 600, fill: ACCENT.warm, anchor: "end" }));
+    root.appendChild(tx(slide.unit, M, chartTop - 24, { size: 26, fill: "#a0a0a0" }));
+    return root;
+  }
+
+  return root;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   11. Top bar
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function buildSteps() {
+  const relayActive = relayUrlActive();
+
+  const s1 = !state.authReady
+    ? { status: "active", label: "Signing in..." }
+    : state.signedIn
+      ? { status: "done", label: "Sign In", detail: state.accountName }
+      : relayActive
+        ? { status: "done", label: "Sign In", detail: "optional", muted: true }
+        : { status: "ready", label: "Sign In", onClick: handleSignIn, testid: "step-signin" };
+
+  const s2 = state.pickedFile
+    ? { status: "done", label: "File", detail: state.pickedFile.name, onClick: handleOpenPicker, tooltip: "Click to pick a different file", testid: "step-file" }
+    : relayActive
+      ? { status: "done", label: "Relay URL" }
+      : state.isRedeeming
+        ? { status: "active", label: "Redeeming..." }
+        : state.isRelaying
+          ? { status: "active", label: "Relaying..." }
+          : state.pickerActive
+            ? { status: "active", label: "Picking..." }
+            : !state.signedIn
+              ? { status: "pending", label: "Pick File" }
+              : { status: "ready", label: "Pick File", onClick: handleOpenPicker, testid: "step-pickfile" };
+
+  const s3 = (!canBoot() || state.isRedeeming || state.isRelaying)
+    ? { status: "pending", label: "Boot" }
+    : { status: "done", label: "Ready to Boot" };
+
+  return [s1, s2, s3];
+}
+
+function renderStepBar() {
+  const bar = el("div.x-stepbar", { role: "list" });
+  buildSteps().forEach((step, i) => {
+    if (i > 0) bar.appendChild(el("span.x-connector", { "aria-hidden": "true" }, "\u203A"));
+    const cls = "x-step " + (step.muted ? "muted" : step.status) + (step.onClick ? " clickable" : "");
+    const indicator = step.muted
+      ? el("span.x-num.numPending", null, String(i + 1))
+      : step.status === "active"
+        ? el("span.x-spinner", { "aria-hidden": "true" })
+        : step.status === "ready"
+          ? el("span.x-num.numActive", null, String(i + 1))
+          : step.status === "done"
+            ? el("span.x-num.numDone", null, "\u2713")
+            : el("span.x-num.numPending", null, String(i + 1));
+    const pill = el(step.onClick ? "button" : "div", {
+      class: cls,
+      type: step.onClick ? "button" : undefined,
+      role: step.onClick ? "button" : "listitem",
+      dataset: step.testid ? { testid: step.testid } : undefined,
+      onclick: step.onClick,
+    },
+      indicator,
+      el("span", null, step.label),
+      step.detail ? el("span.x-stepdetail", { title: step.detail }, step.detail) : null);
+    bar.appendChild(step.tooltip ? attachTip(pill, step.tooltip) : pill);
+  });
+  return bar;
+}
+
+const RELAY_HOW_TO = [
+  "Join a " + WORLD.hostApp + " meeting and start a " + WORLD.productName + " presentation.",
+  "Open DevTools \u203A Network tab.",
+  "Find a POST to GetStreamUrl.api.",
+  'Copy "RelayUrl" from the JSON response.',
+];
+
+OVERLAYS.relayurl = function () {
+  const set = relayUrlActive();
+  const pop = el("div.x-popover.relayurl", { role: "dialog", "aria-label": "Boot without signing in", dataset: { testid: "relay-popover" } });
+  pop.appendChild(el("div.x-pophead", null, "Boot without signing in"));
+  pop.appendChild(el("div.x-popintro", null,
+    "Use a relay URL from a live " + WORLD.hostApp + " meeting to test the bootstrapper without signing in or picking a file."));
+  pop.appendChild(el("div.x-popsectionlabel", null, el("span", null, "How to grab one"), el("span.x-popsectionline")));
+  const ol = el("ol.x-popsteps");
+  RELAY_HOW_TO.forEach((t, i) => {
+    ol.appendChild(el("li.x-popstep", null, el("span.x-popstepnum", null, String(i + 1)), el("span", null, t)));
+  });
+  pop.appendChild(ol);
+  pop.appendChild(el("div.x-popsectionlabel", null, el("span", null, "Paste it here"), el("span.x-popsectionline")));
+  pop.appendChild(textInput({
+    value: inst(PRESENTER_ID).params.presentationUrl,
+    placeholder: "https://" + WORLD.relayEdge.split(".").slice(0, 3).join(".") + "\u2026",
+    ariaLabel: "Relay presentation URL",
+    fkey: "relayurl",
+    testid: "relay-input",
+    width: "100%",
+    onInput: handleRelayUrlChange,
+  }));
+  pop.appendChild(el("div", { class: "x-popfooter" + (set ? " set" : "") }, set
+    ? "Relay URL set \u2014 click Boot \u25B6 on the instance card to start."
+    : "Once pasted, click Boot \u25B6 on the instance card to start."));
+  return pop;
+};
+
+function renderRelayChip() {
+  const set = relayUrlActive();
+  const disabled = anyBusy();
+  const chip = el("button", {
+    class: "x-chip" + (set ? " set" : ""),
+    type: "button",
+    disabled,
+    "aria-label": set ? "Relay URL set" : "Skip sign-in",
+    dataset: { testid: "relay-chip" },
+    onclick: (e) => toggleOverlay("relayurl", e.currentTarget),
+  },
+    el("span.x-chipmarker", null, set ? "\u2713" : "\u25B8"),
+    set ? "Relay URL" : "Skip sign-in");
+  return attachTip(chip, set
+    ? "Relay URL set \u2014 click to view or change"
+    : "Boot without signing in \u2014 paste a relay URL from a meeting");
+}
+
+function renderTopBar() {
+  const p = inst(PRESENTER_ID).params;
+  const sig = [
+    state.authReady, state.signedIn, state.accountName, state.mode,
+    state.pickerActive, state.pickedFile ? state.pickedFile.name : "",
+    state.isRedeeming, state.isRelaying, relayUrlActive(), canBoot(), anyBusy(),
+    p.presentationUrl.length,
+  ].join("|");
+  return reuse("topbar", sig, buildTopBar);
+}
+
+function buildTopBar() {
+  const bar = el("div.x-topbar");
+  bar.appendChild(el("span.x-title", null, WORLD.appTitle));
+
+  const area = el("div.x-steparea");
+  area.appendChild(renderStepBar());
+  area.appendChild(el("span.x-orsep", { "aria-hidden": "true" },
+    el("span.x-orline"), el("span.x-ortext", null, "or"), el("span.x-orline")));
+  area.appendChild(renderRelayChip());
+  bar.appendChild(area);
+
+  const account = el("div.x-account");
+  if (state.signedIn) {
+    account.appendChild(el("span.x-accountname", { title: state.accountName }, state.accountName));
+    account.appendChild(btn({ label: "Sign Out", appearance: "subtle", onClick: handleSignOut, testid: "sign-out" }));
+  }
+  bar.appendChild(account);
+
+  const toggle = el("div.x-modetoggle", { role: "group", "aria-label": "Instance mode" });
+  for (const m of ["single", "dual"]) {
+    toggle.appendChild(el("button", {
+      class: "x-modebtn" + (state.mode === m ? " active" : ""),
+      type: "button",
+      "aria-pressed": String(state.mode === m),
+      dataset: { testid: "mode-" + m },
+      onclick: () => handleModeChange(m),
+    }, m === "single" ? "Single" : "Dual"));
+  }
+  bar.appendChild(toggle);
+  return bar;
+}
+
+function renderKeyboardBar() {
+  return reuse("kbdbar", "static", () => {
+    const kb = (k) => el("kbd.x-kbd", null, k);
+    return el("div.x-kbdbar", { "aria-hidden": "true" },
+      el("span", null, kb("\u2190"), kb("\u2192"), " slide"),
+      el("span", null, kb("P"), " params"),
+      el("span", null, kb("M"), " single / dual"),
+      el("span", null, kb("B"), " boot"),
+      el("span", null, kb("S"), " stop"),
+      el("span", null, kb("R"), " switch role"),
+      el("span", null, kb("L"), " clear logs"),
+      el("span", null, kb("Esc"), " close"));
+  });
+}
+</script>
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════════
+   12. Params drawer
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const MAIN_BOOL_FIELDS = [
+  { key: "isRetry", label: "Is Retry" },
+  { key: "isRtl", label: "Is RTL" },
+  { key: "isTest", label: "Is Test" },
+];
+
+const MAIN_STRING_FIELDS = [
+  { key: "applicationUrl", label: "Application URL" },
+  { key: "onDemandServer", label: "OnDemand Server (edge URL)" },
+  { key: "hostName", label: "Host Name" },
+  { key: "hostExperience", label: "Host Experience" },
+  { key: "uiLocale", label: "UI Locale" },
+  { key: "dataLocale", label: "Data Locale" },
+  { key: "uiHostRing", label: "UI Host Ring" },
+  { key: "environment", label: "Environment (e.g. prod, gov)" },
+  { key: "region", label: "Region (e.g. emea, apac)" },
+  { key: "hostBootTimeoutMs", label: "Host Boot Timeout (ms)" },
+  { key: "hostInitTime", label: "Host Init Time (ISO)" },
+  { key: "documentClickTime", label: "Document Click Time (ISO)" },
+  { key: "startingSlideIndex", label: "Starting Slide Index" },
+  { key: "totalParticipants", label: "Total Participants" },
+  { key: "previousHostSessionId", label: "Previous Host Session ID" },
+  { key: "startingTimelineMappings", label: "Starting Timeline Mappings (JSON)" },
+  { key: "meetingChatId", label: "Meeting Chat ID" },
+  { key: "callId", label: "Call ID", isUuid: true },
+  { key: "contentId", label: "Content ID", isUuid: true },
+  { key: "hostSessionId", label: "Host Session ID", isUuid: true },
+  { key: "userId", label: "User ID", isUuid: true },
+  { key: "tenantId", label: "Tenant ID", isUuid: true },
+  { key: "participantId", label: "Participant ID", isUuid: true },
+  { key: "endpointId", label: "Endpoint ID", isUuid: true },
+  { key: "fileName", label: "File Name" },
+  { key: "fileSize", label: "File Size" },
+  { key: "fileGetUrl", label: "File Get URL (from redeem)" },
+  { key: "presentationUrl", label: "Presentation URL (Relay URL)" },
+  { key: "relayPresentationId", label: "Relay Presentation ID" },
+  { key: "docUniqueId", label: "Doc Unique ID" },
+  { key: "eTag", label: "ETag" },
+  { key: "customFontCatalogUrl", label: "Custom Font Catalog URL" },
+  { key: "vaultSiteUrl", label: "Vault Site URL (from redeem)" },
+  { key: "vaultItemId", label: "Vault Item ID (from picker)" },
+];
+
+const MAIN_JSON_FIELDS = [
+  { key: "featureGates", label: "Feature Gates (JSON string)", rows: 8 },
+  { key: "hostParams", label: "HostParams (JSON)", rows: 12 },
+  { key: "startingMediaStates", label: "Starting Media States (JSON)", rows: 6 },
+];
+
+const ADV_BOOL_FIELDS = [
+  { key: "enableLegacyFallback", label: "Enable Legacy Fallback" },
+  { key: "useTransparentBackground", label: "Use Transparent Background" },
+  { key: "uiHostIsHighContrast", label: "UI Host Is High Contrast" },
+];
+
+const ADV_STRING_FIELDS = [
+  { key: "dynamicWatermarkLabel", label: "Dynamic Watermark Label" },
+  { key: "diagnosticsEntryPoint", label: "Diagnostics Entry Point" },
+  { key: "diagnosticsBootstrapperScriptLoadPoint", label: "Diagnostics Bootstrapper Script Load Point" },
+  { key: "hostBuildVersion", label: "Host Build Version" },
+  { key: "uiHostHighContrastColorSettings", label: "High Contrast Color Settings" },
+  { key: "bundleInfoMajorVersion", label: "Bundle Info Major Version" },
+  { key: "bundleInfoUrl", label: "Bundle Info URL" },
+];
+
+function setParam(id, patch) {
+  Object.assign(inst(id).params, patch);
+  touchParams();
+  renderAll();
+}
+
+/** Bump when params change by any route other than the user typing. Typing
+ *  deliberately does not bump: the live input already holds the new text, and
+ *  leaving the drawer node in place keeps focus and caret undisturbed. */
+function touchParams() { state.paramRev++; }
+
+function renderParamForm(id) {
+  const p = inst(id).params;
+  const form = el("div", { style: { display: "flex", flexDirection: "column", gap: "4px" } });
+
+  const stringField = (f) => field(f.label, el("div.x-fieldrow", null,
+    el("div.x-fieldinput", null, textInput({
+      value: p[f.key],
+      fkey: "param:" + id + ":" + f.key,
+      testid: "param-" + f.key,
+      ariaLabel: f.label,
+      width: "100%",
+      onInput: (v) => { p[f.key] = v; },
+    })),
+    f.isUuid ? btn({ label: "Re-gen", appearance: "subtle", tooltip: "Regenerate identifier", testid: "regen-" + f.key, onClick: () => setParam(id, { [f.key]: uuid() }) }) : null));
+
+  const boolField = (f) => switchRow({
+    label: f.label,
+    checked: !!p[f.key],
+    fkey: "param:" + id + ":" + f.key,
+    testid: "param-" + f.key,
+    onChange: (v) => setParam(id, { [f.key]: v }),
+  });
+
+  const jsonField = (f) => field(f.label, textArea({
+    value: p[f.key],
+    rows: f.rows,
+    fkey: "param:" + id + ":" + f.key,
+    ariaLabel: f.label,
+    onInput: (v) => { p[f.key] = v; },
+  }));
+
+  const accordion = (value, title, children) => {
+    const open = !!state.openAccordions[value];
+    return el("div", { class: "x-accitem" + (open ? " open" : "") },
+      el("button.x-acchead", {
+        type: "button",
+        "aria-expanded": String(open),
+        dataset: { testid: "acc-" + value },
+        onclick: () => { state.openAccordions[value] = !open; renderAll(); },
+      }, el("span.x-accchevron", null, "\u203A"), title),
+      open ? el("div.x-accpanel", null, children) : null);
+  };
+
+  form.appendChild(accordion("main", "Main Parameters", [
+    MAIN_BOOL_FIELDS.map(boolField),
+    MAIN_STRING_FIELDS.map(stringField),
+    MAIN_JSON_FIELDS.map(jsonField),
+  ]));
+  form.appendChild(accordion("advanced", "Advanced Parameters", [
+    ADV_BOOL_FIELDS.map(boolField),
+    ADV_STRING_FIELDS.map(stringField),
+  ]));
+  return form;
+}
+
+function renderDrawer() {
+  const which = state.mode === "single" ? PRESENTER_ID : state.activeParamTab;
+  const sig = [which, state.mode, state.paramRev, state.openAccordions.main, state.openAccordions.advanced].join("|");
+  const wrap = reuse("drawer", sig, () => buildDrawer(which));
+  // The open/closed class is applied outside the signature so the node — and
+  // with it the scroll offset, focus and caret — survives the toggle, and the
+  // width/transform transition actually animates.
+  wrap.className = "x-drawerwrap" + (state.drawerOpen ? " open" : "");
+  return wrap;
+}
+
+function buildDrawer(which) {
+  const wrap = el("div.x-drawerwrap", { dataset: { testid: "drawer" } });
+  const body = el("div.x-drawerbody");
+
+  const head = el("div.x-drawerhead", null, el("span.x-drawertitle", null, "Parameters"));
+  if (state.mode === "dual") {
+    head.appendChild(tabList({
+      value: state.activeParamTab,
+      testidPrefix: "paramtab",
+      tabs: [{ value: PRESENTER_ID, label: "Presenter" }, { value: ATTENDEE_ID, label: "Attendee" }],
+      onChange: (v) => { state.activeParamTab = v; renderAll(); },
+    }));
+  }
+  body.appendChild(head);
+
+  const content = el("div.x-drawercontent", { dataset: { scroll: "drawer:" + which } });
+  content.appendChild(renderParamForm(which));
+  body.appendChild(content);
+
+  wrap.appendChild(body);
+  return wrap;
+}
+
+function renderDrawerHandle() {
+  return reuse("drawerhandle", String(state.drawerOpen), () => {
+    const h = el("button.x-handle", {
+      type: "button",
+      "aria-label": state.drawerOpen ? "Hide parameters" : "Show parameters",
+      "aria-expanded": String(state.drawerOpen),
+      dataset: { testid: "drawer-handle" },
+      onclick: () => { state.drawerOpen = !state.drawerOpen; renderAll(); },
+    }, el("span.x-handleicon", null, state.drawerOpen ? "\u25C0" : "\u25B6"));
+    return attachTip(h, state.drawerOpen ? "Hide parameters" : "Show parameters");
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   13. Instance panel
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+OVERLAYS.instanceconfig = function (o) {
+  const it = inst(o.instanceId);
+  const pop = el("div.x-popover", { role: "dialog", "aria-label": "Instance configuration", dataset: { testid: "config-popover" } });
+  const inner = el("div.x-configpop");
+
+  inner.appendChild(el("div.x-configsection", null,
+    el("span.x-configlabel", null, "Bootstrapper"),
+    radioGroup({
+      value: it.bootType,
+      ariaLabel: "Bootstrapper",
+      options: [
+        { value: "local", label: "Local (CoreJS)", testid: "boot-local" },
+        { value: "cdn", label: "CDN", testid: "boot-cdn" },
+      ],
+      onChange: (v) => {
+        it.bootType = v;
+        // The CDN bootstrapper can't load a locally served slideshow page, so
+        // switching to CDN forces the slideshow back to CDN too.
+        if (v === "cdn" && it.slideshowType === "local") it.slideshowType = "cdn";
+        renderAll();
+      },
+    })));
+
+  inner.appendChild(el("div.x-configsection", null,
+    el("span.x-configlabel", null, "Slideshow"),
+    radioGroup({
+      value: it.slideshowType,
+      ariaLabel: "Slideshow",
+      options: [
+        { value: "local", label: "Local (CoreJS)", disabled: it.bootType === "cdn", testid: "slideshow-local" },
+        { value: "cdn", label: "CDN", testid: "slideshow-cdn" },
+      ],
+      onChange: (v) => { it.slideshowType = v; renderAll(); },
+    }),
+    it.bootType === "cdn" ? el("span.x-confighint", null, "Local slideshow requires Local bootstrapper") : null));
+
+  pop.appendChild(inner);
+  return pop;
+};
+
+function renderInstancePanel(id, showCard) {
+  const it = inst(id);
+  // The card shell is created once per instance and never re-parented, so the
+  // header's buttons stay in the document across every render.
+  let c = cardEls[id];
+  if (!c) {
+    c = cardEls[id] = {
+      root: el("div", { dataset: { testid: "card-" + id } }),
+      headSlot: slot(),
+      stage: el("div", { dataset: { testid: "stage-" + id } }),
+      barSlot: slot(),
+    };
+    add(c.root, [c.headSlot, c.stage, c.barSlot]);
+  }
+
+  const role = it.params.isPresenter ? "presenter" : "attendee";
+  c.root.className = showCard ? "x-card " + role : "x-bare";
+  c.stage.className = "x-stage" + (showCard ? "" : " bare");
+
+  const headSig = [id, showCard, it.phase, it.params.isPresenter, it.bootType, it.slideshowType, anyBusy() || !canBoot()].join("|");
+  setSlot(c.headSlot, reuse("head:" + id, headSig, () => buildCardHead(id, showCard)));
+  setSlot(c.stage, renderStageContent(id));
+  // The nav buttons must keep their identity across the boot-log stream, so the
+  // bar is keyed only on what changes its structure. The slide-number field is
+  // deliberately outside the signature: it is user-owned text.
+  setSlot(c.barSlot, it.phase === "booted"
+    ? reuse("viewerbar:" + id, [id, showCard].join("|"), () => buildViewerBar(id, showCard))
+    : null);
+  return c.root;
+}
+const cardEls = {};
+
+function buildCardHead(id, showCard) {
+  const it = inst(id);
+  const isPresenter = it.params.isPresenter;
+  const role = isPresenter ? "presenter" : "attendee";
+
+  const head = el("div", { class: "x-cardhead" + (showCard ? "" : " bare") });
+  const dotClass = it.phase === "booted" ? " booted" : it.phase === "booting" ? " pending" : "";
+  head.appendChild(el("span", { class: "x-statusdot" + dotClass, dataset: { testid: "status-" + id }, "aria-label": "Status: " + it.phase }));
+
+  head.appendChild(attachTip(el("button", {
+    class: "x-rolebadge " + role,
+    type: "button",
+    dataset: { testid: "role-" + id },
+    onclick: () => toggleRole(id),
+  }, isPresenter ? "Presenter" : "Attendee"),
+    "Switch to " + (isPresenter ? "Attendee" : "Presenter") + (it.phase === "booted" ? " (live)" : "")));
+
+  const configBar = el("div.x-configbar");
+  configBar.appendChild(el("button.x-pill", {
+    type: "button",
+    dataset: { testid: "config-" + id },
+    onclick: (e) => toggleOverlay("instanceconfig", e.currentTarget, { instanceId: id, align: "start" }),
+  },
+    (it.bootType === "cdn" ? "CDN" : "Local") + " Bootstrapper",
+    el("span.x-pillsep", null, " \u00B7 "),
+    (it.slideshowType === "local" ? "Local" : "CDN") + " Slideshow",
+    el("span.x-gear", null, "\u2699")));
+  head.appendChild(configBar);
+
+  const actions = el("div.x-cardactions");
+  if (it.phase === "booted" || it.phase === "booting") {
+    actions.appendChild(btn({ icon: el("span", null, "\u23F9"), appearance: "subtle", stop: true, tooltip: "Stop", ariaLabel: "Stop", testid: "stop-" + id, onClick: () => handleDispose(id) }));
+  } else {
+    actions.appendChild(btn({ icon: el("span", null, "\u25B6"), appearance: "primary", tooltip: "Boot", ariaLabel: "Boot", testid: "boot-" + id, disabled: anyBusy() || !canBoot(), onClick: () => handleBoot(id) }));
+  }
+  actions.appendChild(btn({
+    icon: el("span", null, "\u21BB"), appearance: "subtle", tooltip: "Reload", ariaLabel: "Reload", testid: "reload-" + id,
+    disabled: it.phase !== "booted" && it.phase !== "booting",
+    onClick: () => handleReload(id),
+  }));
+  head.appendChild(actions);
+  return head;
+}
+
+function buildViewerBar(id, showCard) {
+  const it = inst(id);
+  const bar = el("div", { class: "x-viewerbar" + (showCard ? "" : " bare") });
+  bar.appendChild(btn({ icon: el("span", null, "\u2190"), appearance: "subtle", tooltip: "Previous slide", ariaLabel: "Previous slide", testid: "prev-" + id, onClick: () => viewerPrev(id) }));
+  bar.appendChild(btn({ icon: el("span", null, "\u2192"), appearance: "subtle", tooltip: "Next slide", ariaLabel: "Next slide", testid: "next-" + id, onClick: () => viewerNext(id) }));
+  bar.appendChild(el("span.x-viewersep"));
+  bar.appendChild(el("div.x-gotogroup", null,
+    textInput({
+      value: it.goTo, width: "48px", ariaLabel: "Slide number",
+      fkey: "goto:" + id, testid: "goto-" + id,
+      onInput: (v) => { it.goTo = v; },
+      onEnter: () => viewerGoTo(id),
+    }),
+    btn({ label: "Go", appearance: "subtle", tooltip: "Go to slide", testid: "go-" + id, onClick: () => viewerGoTo(id) })));
+  bar.appendChild(el("span.x-viewersep"));
+  bar.appendChild(btn({ label: "Count", appearance: "subtle", tooltip: "Get slide count", testid: "count-" + id, onClick: () => viewerCount(id) }));
+  bar.appendChild(btn({ label: "Pos", appearance: "subtle", tooltip: "Get current position", testid: "pos-" + id, onClick: () => viewerPos(id) }));
+  return bar;
+}
+
+const BOOT_STEP_LABELS = [
+  "Resolving on-demand endpoint",
+  "Building frame container",
+  "Arming timeout wrapper",
+  "Constructing session loader",
+  "Loading viewer bundle",
+  "Awaiting frame handshake",
+];
+
+function renderStageContent(id) {
+  const it = inst(id);
+
+  if (it.phase === "idle") {
+    const hint = !canBoot()
+      ? (state.signedIn ? "Pick a file to continue." : "Sign in and pick a file, or use \u201CSkip sign-in\u201D and paste a relay URL.")
+      : "Ready \u2014 press Boot \u25B6 to start the viewer.";
+    return reuse("idle:" + id, hint, () => el("div.x-stageidle", null,
+      el("div", null, "No session"),
+      el("div", { class: "hint" }, hint)));
+  }
+
+  if (it.phase === "booting") {
+    // Rebuilt every step on purpose — the progress bar is the point, and it
+    // holds no interactive elements to lose.
+    const pct = Math.round((it.bootStep / BOOT_STEP_LABELS.length) * 100);
+    return el("div.x-stageboot", null,
+      el("span.x-spinner"),
+      el("div", null, "Booting\u2026"),
+      el("div.x-bootstage", { dataset: { testid: "bootstage-" + id } }, BOOT_STEP_LABELS[Math.min(it.bootStep, BOOT_STEP_LABELS.length - 1)]),
+      el("div.x-bootbar", null, el("i", { style: { width: pct + "%" } })));
+  }
+
+  if (it.phase === "failed") {
+    return reuse("failed:" + id, String(it.failure), () => el("div.x-stagefail", null,
+      el("div.x-failtitle", null, "Boot failed"),
+      el("div.x-failbody", null, it.failure || "Unknown failure"),
+      btn({ label: "Retry", appearance: "primary", testid: "retry-" + id, onClick: () => handleBoot(id) })));
+  }
+
+  // Twelve inline SVGs plus the thumbnail rail: rebuilding this on every log
+  // line would be both wasteful and enough to swallow thumbnail clicks.
+  const sig = [it.slideIndex, state.presenterSlideIndex, it.params.isPresenter, it.params.fileName].join("|");
+  return reuse("viewer:" + id, sig, () => buildViewer(id));
+}
+
+function buildViewer(id) {
+  const it = inst(id);
+  const isPresenter = it.params.isPresenter;
+  const total = DECK.slides.length;
+  const idx = Math.max(0, Math.min(it.slideIndex, total - 1));
+
+  const viewer = el("div.x-viewer");
+
+  viewer.appendChild(el("div.x-viewertop", null,
+    el("span", { class: "x-livebadge " + (isPresenter ? "presenter" : "attendee") },
+      el("span.x-livedot"), isPresenter ? "Live" : "Following"),
+    el("span.x-deckname", null, truncateMiddle(it.params.fileName || DECK.name, 42)),
+    el("span.x-slidecounter", { dataset: { testid: "counter-" + id } }, (idx + 1) + " / " + total)));
+
+  const main = el("div.x-viewermain");
+
+  const rail = el("div.x-rail", { dataset: { scroll: "rail:" + id, testid: "rail-" + id } });
+  DECK.slides.forEach((slide, i) => {
+    const cls = "x-thumb" + (i === idx ? " current" : "") +
+      (!isPresenter && i === state.presenterSlideIndex && i !== idx ? " presenterAt" : "");
+    const t = el("button", {
+      class: cls, type: "button",
+      "aria-label": "Slide " + (i + 1) + ": " + slide.title,
+      "aria-current": i === idx ? "true" : null,
+      dataset: { testid: "thumb-" + id + "-" + i },
+      onclick: () => viewerGoToIndex(id, i, true),
+    });
+    t.appendChild(renderSlideSvg(slide));
+    t.appendChild(el("span.x-thumbnum", null, String(i + 1)));
+    rail.appendChild(t);
+  });
+  main.appendChild(rail);
+
+  const slideWrap = el("div.x-slidewrap");
+  const slideNode = el("div", { class: "x-slide advancing", dataset: { testid: "slide-" + id, slideIndex: String(idx) } });
+  slideNode.appendChild(renderSlideSvg(DECK.slides[idx]));
+  slideWrap.appendChild(slideNode);
+  main.appendChild(slideWrap);
+
+  viewer.appendChild(main);
+  return viewer;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   14. File picker (stand-in for the host's picker iframe)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function fileGlyph() {
+  const s = svg("svg", { class: "x-pickericon", viewBox: "0 0 16 16", "aria-hidden": "true" });
+  s.appendChild(svg("path", { d: "M3 1.5h6l4 4v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-12a1 1 0 0 1 1-1z", fill: "#c55a11" }));
+  s.appendChild(svg("path", { d: "M9 1.5l4 4H9.5A.5.5 0 0 1 9 5z", fill: "#8a3d0b" }));
+  return s;
+}
+
+function renderPicker() {
+  return reuse("picker", String(state.pickerSelection), buildPicker);
+}
+
+function buildPicker() {
+  const box = el("div.x-picker", { dataset: { testid: "picker" } });
+  box.appendChild(el("div.x-pickerhead", null,
+    el("span.x-pickertitle", null, "Contoso Drive"),
+    el("span.x-pickersub", null, WORLD.vaultHost)));
+
+  const list = el("div.x-pickerlist", { dataset: { scroll: "picker" }, role: "listbox", "aria-label": "Files" });
+  PICKER_FILES.forEach((f, i) => {
+    list.appendChild(el("button", {
+      class: "x-pickerrow" + (i === state.pickerSelection ? " selected" : ""),
+      type: "button", role: "option",
+      "aria-selected": String(i === state.pickerSelection),
+      dataset: { testid: "pickerrow-" + i },
+      onclick: () => {
+        // Double-click is detected by timestamp rather than the dblclick event:
+        // the first click re-renders the list, so the second click lands on a
+        // freshly built node and dblclick would never fire.
+        const now = Date.now();
+        if (state.pickerSelection === i && now - (state.lastPickClick || 0) < 450) {
+          state.lastPickClick = 0;
+          handleFilePicked(f);
+          return;
+        }
+        state.lastPickClick = now;
+        state.pickerSelection = i;
+        renderAll();
+      },
+    },
+      fileGlyph(),
+      el("span.x-pickername", null, f.name),
+      el("span.x-pickermeta", null, formatBytes(f.size)),
+      el("span.x-pickermeta", null, f.modified)));
+  });
+  box.appendChild(list);
+
+  box.appendChild(el("div.x-pickerfoot", null,
+    el("span", { class: "spacer" }, "Double-click a file, or select and press Open"),
+    btn({ label: "Cancel", appearance: "subtle", testid: "picker-cancel", onClick: handlePickerCancel }),
+    btn({ label: "Open", appearance: "primary", testid: "picker-open", onClick: () => handleFilePicked(PICKER_FILES[state.pickerSelection]) })));
+  return box;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   15. Body region
+       Containers are mounted once and only their slots are swapped, so the
+       chain from #region-body down to each button stays continuously attached.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const bodyEls = {};
+
+function ensureBodyEls() {
+  if (bodyEls.mounted) return;
+  const host = document.getElementById("region-body");
+  bodyEls.drawerSlot = slot();
+  bodyEls.handleSlot = slot();
+  bodyEls.dualSlot = slot();
+  bodyEls.col1 = el("div.x-instancecol");
+  bodyEls.arrowSlot = slot();
+  bodyEls.panel2Slot = slot();
+  bodyEls.row = el("div.x-instancesrow", null, bodyEls.col1, bodyEls.arrowSlot, bodyEls.panel2Slot);
+  bodyEls.area = el("div.x-instancearea", null, bodyEls.dualSlot, bodyEls.row);
+  clear(host);
+  add(host, [bodyEls.drawerSlot, bodyEls.handleSlot, bodyEls.area]);
+  bodyEls.mounted = true;
+}
+
+function renderDualActions() {
+  const bothBooted = isBooted(PRESENTER_ID) && isBooted(ATTENDEE_ID);
+  const eitherBooted = isBooted(PRESENTER_ID) || isBooted(ATTENDEE_ID);
+  const disabled = anyBusy() || !canBoot();
+  return reuse("dualactions", [bothBooted, eitherBooted, disabled].join("|"), () => {
+    const barRow = el("div.x-dualactions");
+    if (bothBooted) {
+      barRow.appendChild(btn({
+        label: "\u23F9\u23F9 Stop Both", appearance: "subtle", stop: true,
+        tooltip: "Stop both instances", testid: "stop-both", onClick: handleStopBoth,
+      }));
+    } else {
+      barRow.appendChild(btn({
+        label: "\u25B6\u25B6 Boot Both", appearance: "primary",
+        tooltip: eitherBooted ? "Boot remaining instance" : "Boot both instances sequentially",
+        testid: "boot-both", disabled, onClick: handleBootBoth,
+      }));
+    }
+    return barRow;
+  });
+}
+
+function renderRoutingArrow() {
+  return reuse("routingarrow", "static", () => attachTip(
+    el("div.x-routingarrow", null, "\u2192"),
+    "Events from the left instance are routed to the right instance"));
+}
+
+function renderBodyRegion() {
+  ensureBodyEls();
+  const dual = state.mode === "dual";
+  setSlot(bodyEls.drawerSlot, renderDrawer());
+  setSlot(bodyEls.handleSlot, renderDrawerHandle());
+  setSlot(bodyEls.dualSlot, dual ? renderDualActions() : null);
+  setSlot(bodyEls.col1, state.pickerActive ? renderPicker() : renderInstancePanel(PRESENTER_ID, dual));
+  setSlot(bodyEls.arrowSlot, dual ? renderRoutingArrow() : null);
+  setSlot(bodyEls.panel2Slot, dual ? renderInstancePanel(ATTENDEE_ID, true) : null);
+}
+</script>
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════════════════
+   16. Log region
+       The scroller is built once and kept alive across renders, so its offset
+       survives without needing the scroll memo. Entries are immutable once
+       created, so a mounted node is reused as-is rather than rebuilt — that
+       keeps node identity stable while boot logs stream in, so a click that
+       straddles a batch still lands (mousedown and mouseup would otherwise hit
+       different elements).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const logEls = { root: null, head: null, area: null, empty: null };
+const mountedLogs = new Map();
+
+function ensureLogEls() {
+  if (logEls.root) return;
+  logEls.head = el("div.x-loghead");
+  logEls.area = el("div.x-logarea", {
+    role: "log", "aria-live": "polite", "aria-label": "Logs",
+    dataset: { testid: "logarea" },
+  });
+  logEls.area.addEventListener("scroll", () => {
+    // Ignore the scroll events our own render fires when it pins to the tail;
+    // reading geometry mid-render would latch a stale follow-tail decision and
+    // make the offset drift on every subsequent batch.
+    if (isRendering) return;
+    const a = logEls.area;
+    state.logFollowTail = a.scrollHeight - a.scrollTop - a.clientHeight < 8;
+  });
+  logEls.root = el("div.x-logpanel", null, logEls.head, logEls.area);
+}
+
+function renderLogEntry(e) {
+  const node = el("div", { class: "x-logentry " + e.level, dataset: { testid: "logentry" } });
+  node.appendChild(el("span.x-logts", null, formatLogTime(e.timestamp)));
+  if (e.instanceId) {
+    node.appendChild(el("span.x-logbadge", {
+      style: { backgroundColor: INSTANCE_COLOR[e.instanceId] },
+    }, INSTANCE_LABEL[e.instanceId]));
+  }
+  node.appendChild(el("span.x-loglevel", null, e.level));
+  node.appendChild(document.createTextNode(e.message));
+  return node;
+}
+
+function renderLogRegion() {
+  const host = document.getElementById("region-logs");
+  ensureLogEls();
+  if (host.firstChild !== logEls.root) { clear(host); host.appendChild(logEls.root); }
+
+  /* header — cheap to rebuild and holds no scroll state */
+  const rows = visibleLogs();
+  clear(logEls.head);
+  const left = el("div.x-logheadleft", null,
+    el("span.x-logtitle", null, "Logs"),
+    el("span.x-logcount", { dataset: { testid: "logcount" } }, String(rows.length)));
+  if (state.mode === "dual") {
+    left.appendChild(tabList({
+      value: state.logFilter,
+      testidPrefix: "logtab",
+      tabs: [
+        { value: "all", label: "All" },
+        { value: PRESENTER_ID, label: "Presenter" },
+        { value: ATTENDEE_ID, label: "Attendee" },
+      ],
+      onChange: (v) => { state.logFilter = v; renderAll(); },
+    }));
+  }
+  logEls.head.appendChild(left);
+  logEls.head.appendChild(btn({ label: "Clear", appearance: "subtle", tooltip: "Clear logs", testid: "clear-logs", onClick: clearLogs }));
+
+  /* entries */
+  const area = logEls.area;
+  if (!rows.length) {
+    for (const [, m] of mountedLogs) m.node.remove();
+    mountedLogs.clear();
+    if (!logEls.empty) logEls.empty = el("div.x-logempty", null, "No log entries yet.");
+    if (!logEls.empty.isConnected) area.appendChild(logEls.empty);
+    return;
+  }
+  if (logEls.empty && logEls.empty.isConnected) logEls.empty.remove();
+
+  const needed = new Set();
+  let prev = null;
+  for (const e of rows) {
+    needed.add(e.id);
+    let m = mountedLogs.get(e.id);
+    if (!m) { m = { node: renderLogEntry(e) }; mountedLogs.set(e.id, m); }
+    const shouldFollow = prev ? prev.nextSibling : area.firstChild;
+    if (shouldFollow !== m.node) area.insertBefore(m.node, shouldFollow);
+    prev = m.node;
+  }
+  for (const [id, m] of Array.from(mountedLogs)) {
+    if (!needed.has(id)) { m.node.remove(); mountedLogs.delete(id); }
+  }
+
+  if (state.logFollowTail) area.scrollTop = area.scrollHeight;
+}
+
+function clearLogs() {
+  state.logs = [];
+  state.logFollowTail = true;
+  renderAll();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   17. Scripted async steps
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Run [delayMs, fn] pairs in order. `guard` (optional) aborts the remaining
+ *  steps as soon as it returns false — used so Stop cancels an in-flight boot. */
+function seq(steps, guard) {
+  let i = 0;
+  const tick = () => {
+    if (i >= steps.length) return;
+    const [delay, fn] = steps[i++];
+    setTimeout(() => {
+      if (guard && !guard()) return;
+      fn();
+      tick();
+    }, delay);
+  };
+  tick();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   18. Auth / picker / redeem / relay flows
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function handleSignIn() {
+  state.accountName = WORLD.accounts[0];
+  state.signedIn = true;
+  addLog("log", "Signed in as " + state.accountName);
+}
+
+function handleSignOut() {
+  state.signedIn = false;
+  state.accountName = "";
+  state.pickedFile = null;
+  addLog("log", "Signed out");
+}
+
+function handleOpenPicker() {
+  state.pickerActive = true;
+  state.pickerSelection = 0;
+  addLog("log", "Opening Contoso Drive file picker...");
+}
+
+function handlePickerCancel() {
+  state.pickerActive = false;
+  addLog("log", "File picker closed");
+}
+
+function handleFilePicked(file) {
+  if (!file) return;
+  addLog("log", "File picked: " + file.name);
+  state.pickedFile = file;
+  // Latest action wins: picking a file overrides any hand-pasted relay URL.
+  state.relayUrlManuallySet = false;
+  state.pickerActive = false;
+
+  const itemId = hex(32).toUpperCase();
+  const siteUrl = "https://" + WORLD.vaultHost + "/personal/demo_fabrikam_example_com";
+  const p = inst(PRESENTER_ID).params;
+  Object.assign(p, {
+    fileName: file.name,
+    fileSize: String(file.size),
+    vaultSiteUrl: siteUrl,
+    vaultItemId: itemId,
+    fileGetUrl: "",
+    presentationUrl: "",
+  });
+  touchParams();
+
+  state.isRedeeming = true;
+  renderAll();
+
+  const redeemed = {
+    fileGetUrl: "https://" + WORLD.vaultHost + "/_api/cfp/files/" + hex(32) + "/contents?access_token=" + hex(24),
+    applicationUrl: buildApplicationUrl(),
+    customFontCatalogUrl: "https://" + WORLD.fontsHost + "/shared/fontpack/",
+    eTag: '"{' + uuid() + '},3"',
+    docUniqueId: uuid() + "_" + uuid() + "_" + uuid(),
+  };
+  const relayId = uuid();
+  const relayUrl = "https://" + WORLD.relayEdge + "/s/" + hex(22) + "?rev=3";
+
+  seq([
+    [180, () => addLog("debug", "[Redeem] POST https://" + WORLD.vaultHost + "/_api/cfp/redeem")],
+    [220, () => addLog("debug", "[Redeem] 200 OK in " + randInt(120, 320) + "ms")],
+    [140, () => addLog("debug", "[Redeem] docUniqueId resolved, eTag captured")],
+    [120, () => {
+      Object.assign(p, redeemed);
+      touchParams();
+      addLog("log", "Redeem successful: " + file.name + " (" + file.size + " bytes)");
+      state.isRedeeming = false;
+      state.isRelaying = true;
+      addLog("log", "Getting relay URL...");
+      renderAll();
+    }],
+    [200, () => addLog("debug", "[Relay] POST https://" + WORLD.relayHost + "/api/v2/session")],
+    [240, () => addLog("debug", "[Relay] 200 OK in " + randInt(90, 210) + "ms \u2014 edge=" + WORLD.relayEdge.split(".")[0])],
+    [120, () => {
+      p.presentationUrl = relayUrl;
+      // The bootstrapper requires a bare identifier here, so the service's
+      // "relayRequestID_" prefix is stripped before it is stored.
+      p.relayPresentationId = relayId;
+      addLog("log", "Relay successful: " + relayUrl);
+      if (state.mode === "dual") {
+        Object.assign(inst(ATTENDEE_ID).params, {
+          fileName: file.name,
+          fileSize: String(file.size),
+          vaultSiteUrl: siteUrl,
+          vaultItemId: itemId,
+          presentationUrl: relayUrl,
+          relayPresentationId: relayId,
+        }, redeemed);
+      }
+      state.isRelaying = false;
+      touchParams();
+      renderAll();
+    }],
+  ]);
+}
+
+/** Reverse-lookup the render host from a relay URL's edge prefix. Mid-typing
+ *  garbage is left alone rather than clearing a good value. */
+function buildApplicationUrlFromRelayUrl(url) {
+  const u = new URL(url);
+  const edge = u.hostname.split(".")[0];
+  if (!edge) throw new Error("no edge prefix");
+  const src = encodeURIComponent("https://" + WORLD.vaultHost + "/personal/demo_fabrikam_example_com/_api/cfp/files/" + hex(32));
+  return "https://" + edge + ".render.contoso-apps.example.com/p/SlideFrame.view?SlideView=ReadingView&ui=en%2DUS&SrcDoc=" + src;
+}
+
+function handleRelayUrlChange(url) {
+  state.relayUrlManuallySet = true;
+  // Latest action wins: pasting a URL overrides a previously picked file.
+  state.pickedFile = null;
+
+  const patch = { presentationUrl: url };
+  if (url === "") {
+    patch.applicationUrl = "";
+  } else {
+    try { patch.applicationUrl = buildApplicationUrlFromRelayUrl(url); }
+    catch (e) { /* unparseable mid-typing — leave applicationUrl as-is */ }
+  }
+  Object.assign(inst(PRESENTER_ID).params, patch);
+  if (state.mode === "dual") Object.assign(inst(ATTENDEE_ID).params, patch);
+  touchParams();
+  renderAll();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   19. Boot / dispose
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function emitEvent(id, payload) {
+  addLog("event", "Viewer event: " + JSON.stringify(payload), id);
+}
+
+function handleBoot(id) {
+  const it = inst(id);
+  if (it.phase === "booting" || it.phase === "booted") return;
+  const log = logFor(id);
+
+  it.phase = "booting";
+  it.bootStep = 0;
+  it.failure = null;
+  const token = ++it.advanceToken;
+  const alive = () => it.advanceToken === token && it.phase === "booting";
+
+  log("log", "=== BOOT START (" + it.bootType + ") ===");
+  renderAll();
+
+  const timeout = parseInt(it.params.hostBootTimeoutMs, 10) || 110000;
+  const steps = [];
+
+  if (it.bootType === "cdn") {
+    steps.push([160, () => log("debug", "[CDN] Loading bootstrapper from https://" + WORLD.cdnHost + "/bootstrapper/v1/loader.js")]);
+    steps.push([220, () => log("debug", "[CDN] Bootstrapper script ready (rev " + randInt(4100, 4180) + ")")]);
+  }
+
+  const detail = [
+    "[Boot] OnDemand endpoint resolved: " + WORLD.onDemandHost,
+    "[Boot] FrameContainer created from container ownerDocument",
+    "[Boot] Timeout wrapper armed \u2014 HostBootTimeoutMs=" + timeout,
+    "[Boot] SessionLoader constructed",
+    it.slideshowType === "local"
+      ? "[Boot] Loading local slideshow page (CoreJS build)"
+      : "[Boot] Loading viewer bundle from " + WORLD.renderHost,
+    "[Boot] Session frame appended \u2014 awaiting handshake",
+  ];
+
+  detail.forEach((line, i) => {
+    steps.push([i === 0 ? 200 : randInt(160, 280), () => {
+      it.bootStep = i + 1;
+      log("debug", line);
+      renderAll();
+    }]);
+  });
+
+  // A timeout below the first handshake window is the one boot failure the
+  // demo can reach: lower "Host Boot Timeout (ms)" in the params drawer to
+  // watch the wrapper win the race.
+  if (timeout < 1500) {
+    steps.length = Math.min(steps.length, 3);
+    steps.push([Math.max(120, timeout), () => {
+      it.phase = "failed";
+      it.failure = "TimeoutInitialize (code 5) \u2014 no frame handshake within " + timeout + "ms";
+      log("error", "Bootstrapper timeout: TimeoutInitialize after " + timeout + "ms");
+      log("error", 'FnOnInitializeFailure fired: {"errorCode":5,"errorName":"TimeoutInitialize"}');
+      renderAll();
+    }]);
+    seq(steps, alive);
+    return;
+  }
+
+  steps.push([260, () => {
+    it.phase = "booted";
+    it.bootStep = detail.length;
+    it.slideIndex = it.params.isPresenter ? 0 : state.presenterSlideIndex;
+    it.goTo = String(Math.min(2, DECK.slides.length));
+    log("log", "initializeSessionPending returned pending app");
+    log("log", "FnOnInitializeSuccess fired - viewer is ready!");
+    emitEvent(id, {
+      EventType: EventType.OnPresentationOpened,
+      Name: EventName[EventType.OnPresentationOpened],
+      PresentationName: it.params.fileName,
+      SlideCount: DECK.slides.length,
+    });
+    renderAll();
+  }]);
+
+  seq(steps, alive);
+}
+
+function handleDispose(id) {
+  const it = inst(id);
+  const log = logFor(id);
+  log("log", "=== DISPOSE ===");
+  if (it.phase === "booted") log("log", "viewer.dispose() called");
+  else if (it.phase === "booting") log("log", "pendingApp.fail() called");
+  it.advanceToken++;      // cancels any in-flight boot sequence
+  it.phase = "idle";
+  it.bootStep = 0;
+  it.failure = null;
+  renderAll();
+}
+
+function handleReload(id) {
+  logFor(id)("log", "=== RELOAD ===");
+  handleDispose(id);
+  setTimeout(() => handleBoot(id), 140);
+}
+
+function handleBootBoth() {
+  addLog("log", "=== BOOT BOTH ===");
+  if (!isBooted(PRESENTER_ID)) handleBoot(PRESENTER_ID);
+  setTimeout(() => { if (!isBooted(ATTENDEE_ID)) handleBoot(ATTENDEE_ID); }, 300);
+}
+
+function handleStopBoth() {
+  addLog("log", "=== STOP BOTH ===");
+  handleDispose(PRESENTER_ID);
+  handleDispose(ATTENDEE_ID);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   20. Viewer controls + presenter → attendee routing
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Mirrors routePresenterEvent: in the real app this crosses the host's
+ *  transport; here both instances live in one page, so the attendee's state is
+ *  updated directly. */
+function routePresenterEvent(slideIndex) {
+  const attendee = inst(ATTENDEE_ID);
+  if (state.mode !== "dual" || attendee.phase !== "booted") return;
+  attendee.slideIndex = slideIndex;
+  logA("debug", "Sync: goToSlide(" + slideIndex + ")");
+}
+
+function viewerGoToIndex(id, index, announce) {
+  const it = inst(id);
+  if (it.phase !== "booted") return;
+  const clamped = Math.max(0, Math.min(index, DECK.slides.length - 1));
+  if (clamped === it.slideIndex && !announce) return;
+  it.slideIndex = clamped;
+
+  emitEvent(id, {
+    EventType: EventType.OnPositionChanged,
+    Name: EventName[EventType.OnPositionChanged],
+    SlideIndex: clamped,
+    TimeLineMappings: [],
+  });
+
+  if (id === PRESENTER_ID && it.params.isPresenter) {
+    state.presenterSlideIndex = clamped;
+    routePresenterEvent(clamped);
+  }
+  renderAll();
+}
+
+function viewerNext(id) {
+  const it = inst(id);
+  if (it.phase !== "booted") return;
+  logFor(id)("log", "viewer.next() called");
+  if (it.slideIndex >= DECK.slides.length - 1) {
+    emitEvent(id, { EventType: EventType.OnEnterEndOfSlideshow, Name: EventName[EventType.OnEnterEndOfSlideshow] });
+    renderAll();
+    return;
+  }
+  viewerGoToIndex(id, it.slideIndex + 1, true);
+}
+
+function viewerPrev(id) {
+  const it = inst(id);
+  if (it.phase !== "booted") return;
+  logFor(id)("log", "viewer.prev() called");
+  viewerGoToIndex(id, it.slideIndex - 1, true);
+}
+
+function viewerGoTo(id) {
+  const it = inst(id);
+  if (it.phase !== "booted") return;
+  const n = parseInt(it.goTo, 10);
+  if (isNaN(n)) { logFor(id)("warn", 'viewer.goToSlide("' + it.goTo + '") ignored \u2014 not a number'); return; }
+  logFor(id)("log", "viewer.goToSlide(" + n + ") called");
+  viewerGoToIndex(id, n - 1, true);
+}
+
+function viewerCount(id) {
+  const it = inst(id);
+  if (it.phase !== "booted") return;
+  logFor(id)("log", "viewer.getSlidesInShowCount() called");
+  emitEvent(id, {
+    EventType: EventType.GetSlidesInShowCount,
+    Name: EventName[EventType.GetSlidesInShowCount],
+    SlidesInShowCount: DECK.slides.length,
+  });
+}
+
+function viewerPos(id) {
+  const it = inst(id);
+  if (it.phase !== "booted") return;
+  logFor(id)("log", "viewer.getCurrentPosition() called");
+  emitEvent(id, {
+    EventType: EventType.GetCurrentPosition,
+    Name: EventName[EventType.GetCurrentPosition],
+    SlideIndex: it.slideIndex,
+  });
+}
+
+function toggleRole(id) {
+  const it = inst(id);
+  const next = !it.params.isPresenter;
+  it.params.isPresenter = next;
+  touchParams();
+  if (it.phase === "booted") {
+    const roleCode = next ? 1 : 0;
+    logFor(id)("log", "viewer.switchRole(" + roleCode + ") called \u2014 now " + (next ? "Presenter" : "Attendee"));
+    emitEvent(id, { EventType: EventType.RoleChangedOutbound, Name: EventName[EventType.RoleChangedOutbound], IsPresenter: next });
+  }
+  renderAll();
+}
+
+function handleModeChange(mode) {
+  if (state.mode === mode) return;
+  state.mode = mode;
+  if (mode === "dual") {
+    const attendee = inst(ATTENDEE_ID);
+    attendee.params = cloneParamsForAttendee(inst(PRESENTER_ID).params);
+    state.drawerOpen = false;
+  } else {
+    state.logFilter = "all";
+  }
+  touchParams();
+  renderAll();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   21. Keyboard
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** The instance keyboard shortcuts act on: the presenter panel when it's
+ *  booted, otherwise whichever panel is. */
+function activeInstanceId() {
+  if (isBooted(PRESENTER_ID)) return PRESENTER_ID;
+  if (state.mode === "dual" && isBooted(ATTENDEE_ID)) return ATTENDEE_ID;
+  return PRESENTER_ID;
+}
+
+function isTypingTarget(t) {
+  if (!t) return false;
+  const tag = t.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || t.isContentEditable;
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    if (state.overlay) { closeOverlay(); return; }
+    if (state.pickerActive) { handlePickerCancel(); return; }
+    return;
+  }
+  if (isTypingTarget(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+
+  const id = activeInstanceId();
+  switch (e.key) {
+    case "ArrowRight": e.preventDefault(); viewerNext(id); break;
+    case "ArrowLeft": e.preventDefault(); viewerPrev(id); break;
+    case "p": case "P":
+      e.preventDefault(); state.drawerOpen = !state.drawerOpen; renderAll(); break;
+    case "m": case "M":
+      e.preventDefault(); handleModeChange(state.mode === "single" ? "dual" : "single"); break;
+    case "b": case "B":
+      e.preventDefault();
+      if (!canBoot() || anyBusy()) break;
+      if (state.mode === "dual") handleBootBoth(); else handleBoot(PRESENTER_ID);
+      break;
+    case "s": case "S":
+      e.preventDefault();
+      if (state.mode === "dual") handleStopBoth(); else handleDispose(PRESENTER_ID);
+      break;
+    case "r": case "R":
+      e.preventDefault(); toggleRole(id); break;
+    case "l": case "L":
+      e.preventDefault(); clearLogs(); break;
+  }
+});
+
+window.addEventListener("resize", () => { if (state.overlay) closeOverlay(); });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   22. Init
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+renderAll();
+
+// The real app shows "Signing in..." while the identity client initializes;
+// this reproduces that first beat so the spinner state is reachable.
+setTimeout(() => {
+  state.authReady = true;
+  addLog("debug", "Identity client initialized against " + WORLD.identityHost);
+}, 750);
+
+// Expose a tiny handle so a headless harness can inspect state without
+// scraping the DOM. Read-only by convention; nothing in the UI depends on it.
+window.__demo = {
+  state, DECK, inst, renderAll, visibleLogs,
+  renders: () => renderCount,
+  touchParams,
+};
+</script>
+</body>
+</html>
+

@@ -25,11 +25,11 @@
 	<link href="https://fonts.googleapis.com/css?family=Space+Mono" rel="stylesheet">
 	<link href="https://fonts.googleapis.com/css?family=Kaushan+Script" rel="stylesheet">
 
-	<link rel="stylesheet" href="css/animate.css?v=13">
-	<link rel="stylesheet" href="css/icomoon.css?v=13">
-	<link rel="stylesheet" href="css/bootstrap.css?v=13">
-	<link rel="stylesheet" href="css/style.css?v=13">
-	<link rel="stylesheet" href="css/custom.css?v=13">
+	<link rel="stylesheet" href="css/animate.css?v=20">
+	<link rel="stylesheet" href="css/icomoon.css?v=20">
+	<link rel="stylesheet" href="css/bootstrap.css?v=20">
+	<link rel="stylesheet" href="css/style.css?v=20">
+	<link rel="stylesheet" href="css/custom.css?v=20">
 
 	<script src="js/modernizr-2.6.2.min.js"></script>
 	<!--[if lt IE 9]>
@@ -247,9 +247,12 @@
 			<div class="row">
 
 				<div class="col-md-3 text-center col-padding animate-box">
-					<div class="work work--flat">
+					<div class="work work--preview work--clickable" style="background-image: url(images/powerpoint-bootstrapper.jpg);"
+						role="button" tabindex="0" data-slideshow="bootstrapper"
+						aria-label="PowerPoint Live Bootstrapper &mdash; open screenshots">
 						<div class="desc">
 							<h3>PowerPoint Live Bootstrapper</h3>
+							<span>More details <i class="icon-link2"></i></span>
 						</div>
 					</div>
 				</div>
@@ -269,11 +272,12 @@
 					</a>
 				</div>
 				<div class="col-md-3 text-center col-padding animate-box">
-					<div class="work work--flat">
+					<a href="demos/playground-demo.html" target="_blank" rel="noopener" class="work work--preview work--link" style="background-image: url(images/playground.jpg);">
 						<div class="desc">
 							<h3>Playground</h3>
+							<span>Live UI Demo <i class="icon-link2"></i></span>
 						</div>
-					</div>
+					</a>
 				</div>
 				<div class="col-md-3 text-center col-padding animate-box">
 					<a href="https://patents.google.com/patent/US11179064B2/en" target="_blank" rel="noopener" class="work work--flat work--link">
@@ -373,9 +377,22 @@
 
 	<div id="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer" hidden>
 		<button id="lightbox-close" type="button" aria-label="Close photo">&times;</button>
+		<button id="lightbox-prev" type="button" aria-label="Previous slide" hidden><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="transform: scaleX(-1);"><path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+		<button id="lightbox-next" type="button" aria-label="Next slide" hidden><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
 		<figure>
 			<img id="lightbox-img" src="" alt="">
 			<figcaption id="lightbox-cap"></figcaption>
+			<!-- Slideshow-only caption block: one block for all slides. The
+			     paragraph text comes from the bootCaption JS constant below at
+			     open time; the links are markup, so they stay real anchors. -->
+			<figcaption id="lightbox-story" hidden>
+				<span id="lightbox-count"></span>
+				<p id="lightbox-story-text"></p>
+				<div class="lightbox-links">
+					<a href="https://techcommunity.microsoft.com/blog/microsoft365insiderblog/stay-in-sync-in-powerpoint-live/4529908" target="_blank" rel="noopener">Stay in sync in PowerPoint Live</a>
+					<a href="https://learn.microsoft.com/en-us/microsoft-365/document-collaboration-partner-program/scenarios/present?tabs=presenter" target="_blank" rel="noopener">Microsoft Learn: partner presentation scenarios</a>
+				</div>
+			</figcaption>
 		</figure>
 	</div>
 
@@ -427,22 +444,57 @@
 			stage.classList.add('hero-icons-in');
 		}
 
-		/* --- photo lightbox: fit to screen, keep aspect ratio --- */
+		/* --- photo lightbox: fit to screen, keep aspect ratio ---
+		   Two modes share one dialog. Single-image mode is the original photo
+		   behaviour, untouched: openBox(href, alt, caption). Slideshow mode
+		   (openSlideshow) adds prev/next, a counter, and a caption block that
+		   is the same for every slide. slides === null means single-image
+		   mode, so every slideshow-only control stays hidden for photos. */
 		var box = document.getElementById('lightbox');
 		var img = document.getElementById('lightbox-img');
 		var closeBtn = document.getElementById('lightbox-close');
+		var prevBtn = document.getElementById('lightbox-prev');
+		var nextBtn = document.getElementById('lightbox-next');
+		var story = document.getElementById('lightbox-story');
+		var storyText = document.getElementById('lightbox-story-text');
+		var countEl = document.getElementById('lightbox-count');
 		var lastFocus = null;
 		var cap = document.getElementById('lightbox-cap');
-		function openBox(href, alt, caption) {
-			img.src = href; img.alt = alt || '';
-			cap.textContent = caption || '';
+		var slides = null, slideIndex = 0;
+		function showDialog() {
 			box.hidden = false;
 			document.body.style.overflow = 'hidden';
 			lastFocus = document.activeElement;
 			closeBtn.focus();
 		}
+		function openBox(href, alt, caption) {
+			slides = null;
+			box.classList.remove('is-slideshow');
+			prevBtn.hidden = true; nextBtn.hidden = true; story.hidden = true;
+			img.src = href; img.alt = alt || '';
+			cap.textContent = caption || '';
+			showDialog();
+		}
+		function showSlide(i) {
+			slideIndex = (i + slides.length) % slides.length;
+			var s = slides[slideIndex];
+			img.src = s.src; img.alt = s.alt;
+			countEl.textContent = (slideIndex + 1) + ' / ' + slides.length;
+		}
+		function openSlideshow(list, text) {
+			slides = list;
+			box.classList.add('is-slideshow');
+			cap.textContent = '';
+			storyText.textContent = text || '';
+			prevBtn.hidden = false; nextBtn.hidden = false; story.hidden = false;
+			showSlide(0);
+			showDialog();
+		}
 		function closeBox() {
 			box.hidden = true; img.src = ''; cap.textContent = '';
+			slides = null;
+			box.classList.remove('is-slideshow');
+			prevBtn.hidden = true; nextBtn.hidden = true; story.hidden = true;
 			document.body.style.overflow = '';
 			if (lastFocus) lastFocus.focus();
 		}
@@ -465,10 +517,44 @@
 				if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPanel(); }
 			});
 		}
-		box.addEventListener('click', function (e) { if (e.target !== img) closeBox(); });
+		/* Bootstrapper tile: click or Enter/Space opens the three screenshots.
+		   Ordered as the story runs -- the boot, the booted deck, the full
+		   presenter surface the control API drives. bootCaption is the only
+		   copy of this text (the tile itself no longer carries a paragraph),
+		   so this is the place to edit it. */
+		var bootTile = document.querySelector('[data-slideshow="bootstrapper"]');
+		if (bootTile) {
+			var bootCaption = 'A client-side script that boots the PowerPoint Live iframe and exposes its control API. Rewritten on Microsoft’s modern build stack to be more observable, removing years of tech debt with a simpler architecture that showed 50% fewer errors in customer A/B tests.';
+			var bootSlides = [
+				{ src: 'images/bootstrapper-slide-1.jpg', alt: 'PowerPoint Live booting inside a Teams meeting, showing the "Warming up your slides..." loading state' },
+				{ src: 'images/bootstrapper-slide-2.jpg', alt: 'The booted deck presenting in Teams, with slide navigation, thumbnail and ink controls' },
+				{ src: 'images/bootstrapper-slide-3.jpg', alt: 'Full presenter view: current slide, speaker notes, questions from chat, and the slide filmstrip' }
+			];
+			var openBoot = function () {
+				openSlideshow(bootSlides, bootCaption);
+			};
+			bootTile.addEventListener('click', openBoot);
+			bootTile.addEventListener('keydown', function (e) {
+				if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openBoot(); }
+			});
+		}
+		prevBtn.addEventListener('click', function () { if (slides) showSlide(slideIndex - 1); });
+		nextBtn.addEventListener('click', function () { if (slides) showSlide(slideIndex + 1); });
+		/* Backdrop click still closes. The guard exempts the slideshow controls
+		   and the caption block so its links stay clickable; in photo mode
+		   those elements are hidden, so the behaviour is byte-for-byte the old
+		   "anything but the image closes it". */
+		box.addEventListener('click', function (e) {
+			if (e.target.closest && e.target.closest('#lightbox-story, #lightbox-prev, #lightbox-next')) return;
+			if (e.target !== img) closeBox();
+		});
 		closeBtn.addEventListener('click', closeBox);
 		document.addEventListener('keydown', function (e) {
-			if (e.key === 'Escape' && !box.hidden) closeBox();
+			if (box.hidden) return;
+			if (e.key === 'Escape') { closeBox(); return; }
+			if (!slides) return;
+			if (e.key === 'ArrowLeft') { e.preventDefault(); showSlide(slideIndex - 1); }
+			if (e.key === 'ArrowRight') { e.preventDefault(); showSlide(slideIndex + 1); }
 		});
 	})();
 	</script>

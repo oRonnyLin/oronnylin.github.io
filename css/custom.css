@@ -234,7 +234,22 @@
 	position: absolute;
 	inset: 0;
 	background: var(--tile-overlay);
+	transition: background .25s ease;
 	z-index: 1;
+}
+
+/* Hover/focus cue for preview tiles: deepen the scrim instead of the old
+   background-color swap, since background-image now belongs to the tile
+   itself (inline) rather than the tile getting a flat color. Contrast only
+   improves as the scrim darkens past --tile-overlay's .85 alpha (see the
+   contrast note above), so no new contrast math is needed. Covers both the
+   linked tiles (a.work--link) and the button tile (.work--clickable, the
+   PowerPoint Live Bootstrapper) so all three preview tiles match. */
+a.work--link:hover::before,
+a.work--link:focus::before,
+.work--clickable:hover::before,
+.work--clickable:focus::before {
+	background: rgba(46, 63, 58, .92); /* --tile-overlay's rgb, deeper alpha */
 }
 
 .work--preview .desc {
@@ -264,14 +279,35 @@
 	font-size: 11px;
 }
 
-/* Only the tiles that actually go somewhere get a hover affordance. */
+/* --- Work tile that acts as a button ---------------------------------------
+   .work--clickable: for a tile that isn't a link but still does something on
+   click (role="button" in the markup) -- currently the PowerPoint Live
+   Bootstrapper tile, which opens a screenshot lightbox. Gives it the same
+   pointer/focus affordance a.work--link gets below, since a plain div
+   otherwise looks inert. */
+
+.work--clickable {
+	cursor: pointer;
+}
+
+.work--clickable:focus-visible {
+	outline: 2px solid #fff;
+	outline-offset: -4px;
+}
+
+/* Only the tiles that actually go somewhere get a hover affordance.
+   background-color, not the background shorthand: a shorthand here resets
+   background-size/position too, and .work--preview tiles carry their
+   screenshot via inline style="background-image: ...". The image longhand
+   survives (inline wins), but size/position fell back to auto / 0% 0% on
+   hover -- the screenshot visibly jumped to natural size, top-left. */
 a.work--link {
 	transition: background .25s ease;
 }
 
 a.work--link:hover,
 a.work--link:focus {
-	background: #3B5049;
+	background-color: #3B5049;
 }
 
 a.work--link:focus {
@@ -597,6 +633,9 @@ a:focus-visible {
 	right: 18px;
 	width: 44px;
 	height: 44px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	border: 0;
 	border-radius: 50%;
 	background: rgba(255, 255, 255, .12);
@@ -683,6 +722,145 @@ a:focus-visible {
 
 #lightbox-cap:empty {
 	display: none;
+}
+
+/* --- Lightbox slideshow mode ----------------------------------------------
+   The same dialog, with prev/next, a counter, and a caption block that stays
+   the same across slides. Everything here is scoped to .is-slideshow or to
+   ids that are [hidden] in photo mode, so opening a photo renders exactly as
+   before.
+
+   Contrast, worst case (the backdrop rgba(16,24,22,.94) composited over a
+   pure white page underneath):
+     R: 16*.94 + 255*.06 = 30.34 -> 30
+     G: 24*.94 + 255*.06 = 37.86 -> 38
+     B: 22*.94 + 255*.06 = 35.98 -> 36
+   effective backdrop rgb(30, 38, 36). On that:
+     links, #8FD3C7 (a light tint of --accent) ......... 9.07:1
+     description, rgba(255,255,255,.85) .............. 11.47:1
+     counter, rgba(255,255,255,.7) .................... 8.28:1
+   All clear WCAG AA (4.5:1) and AAA (7:1). The links are underlined as well
+   as tinted, so colour is not the only cue. Note --accent itself is NOT
+   usable here: #8FD3C7 on --accent is 2.80:1, which is why link hover goes
+   to white rather than to the accent the way the close button does. */
+
+#lightbox-prev,
+#lightbox-next {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 44px;
+	height: 44px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 0;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, .12);
+	color: #fff;
+	font-family: "Space Mono", Menlo, Consolas, monospace;
+	font-size: 24px;
+	line-height: 1;
+	cursor: pointer;
+	z-index: 2;
+}
+
+#lightbox-prev { left: 18px; }
+#lightbox-next { right: 18px; }
+
+#lightbox-prev[hidden],
+#lightbox-next[hidden],
+#lightbox-story[hidden] {
+	display: none;
+}
+
+#lightbox-prev:hover,
+#lightbox-prev:focus-visible,
+#lightbox-next:hover,
+#lightbox-next:focus-visible {
+	background: var(--accent);
+	outline: 2px solid #fff;
+	outline-offset: 2px;
+}
+
+/* Room for the caption block under the image, and for the arrows beside it
+   rather than on top of it. */
+#lightbox.is-slideshow figure {
+	max-width: min(1000px, 82vw);
+	gap: 14px;
+}
+
+#lightbox.is-slideshow figure img {
+	max-height: 58vh;
+}
+
+/* The backdrop is cursor:zoom-out because clicking it closes; the caption
+   block is not a close target (see the guard in the inline script), so it
+   gets the ordinary cursor. */
+#lightbox-story {
+	cursor: default;
+	text-align: center;
+	max-width: 72ch;
+}
+
+#lightbox-count {
+	display: block;
+	margin-bottom: 10px;
+	font-family: "Space Mono", Menlo, Consolas, monospace;
+	font-size: 12px;
+	letter-spacing: 2px;
+	color: rgba(255, 255, 255, .7);
+}
+
+#lightbox-story p {
+	margin: 0 0 14px;
+	font-size: 14px;
+	line-height: 1.6;
+	color: rgba(255, 255, 255, .85);
+}
+
+.lightbox-links {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 8px 22px;
+}
+
+.lightbox-links a {
+	color: #8FD3C7;
+	font-family: "Space Mono", Menlo, Consolas, monospace;
+	font-size: 12px;
+	letter-spacing: .5px;
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+.lightbox-links a:hover,
+.lightbox-links a:focus-visible {
+	color: #fff;
+}
+
+@media screen and (max-width: 768px) {
+	#lightbox-prev,
+	#lightbox-next {
+		width: 38px;
+		height: 38px;
+		font-size: 20px;
+	}
+	#lightbox-prev { left: 6px; }
+	#lightbox-next { right: 6px; }
+	#lightbox.is-slideshow figure {
+		max-width: 100%;
+	}
+	#lightbox.is-slideshow figure img {
+		max-height: 40vh;
+	}
+	#lightbox.is-slideshow {
+		padding: 0 52px;
+	}
+	#lightbox-story p {
+		font-size: 13px;
+	}
 }
 
 /* --- Experience & Education on the wash ------------------------------------
